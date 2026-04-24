@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Bed-Mod Loader</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
 * {
   box-sizing: border-box;
@@ -221,25 +222,70 @@ const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
 const fileList = document.getElementById("fileList");
 
-function addFiles(files) {
+<script>
+async function addFiles(files) {
   for (const file of files) {
     const item = document.createElement("div");
     item.className = "file-item";
 
     let type = "Unknown";
+    let extra = "";
+
     if (file.name.endsWith(".mcpack")) type = "Minecraft Pack";
     if (file.name.endsWith(".mcaddon")) type = "Minecraft Add-on";
-    if (file.name.endsWith(".zip")) type = "Zip Archive";
+    if (file.name.endsWith(".zip")) {
+      type = "Zip Archive";
+
+      try {
+        const zip = await JSZip.loadAsync(file);
+        const names = Object.keys(zip.files);
+
+        const manifestCount = names.filter(n => n.endsWith("manifest.json")).length;
+
+        if (manifestCount === 1) {
+          extra = `<br><button onclick="convertZipFile('${file.name}', 'mcpack')">Convert to .mcpack</button>`;
+          window.pendingZipFiles[file.name] = file;
+        } else if (manifestCount >= 2) {
+          extra = `<br><button onclick="convertZipFile('${file.name}', 'mcaddon')">Convert to .mcaddon</button>`;
+          window.pendingZipFiles[file.name] = file;
+        } else {
+          extra = `<br><span class="badge">No manifest found</span>`;
+        }
+      } catch (err) {
+        extra = `<br><span class="badge">Could not read zip</span>`;
+      }
+    }
 
     item.innerHTML = `
       <b>${file.name}</b><br>
       Size: ${(file.size / 1024).toFixed(1)} KB<br>
       <span class="badge">${type}</span>
+      ${extra}
     `;
 
     fileList.appendChild(item);
   }
 }
+
+window.pendingZipFiles = {};
+
+async function convertZipFile(fileName, outputType) {
+  const file = window.pendingZipFiles[fileName];
+  if (!file) return alert("File not found.");
+
+  const arrayBuffer = await file.arrayBuffer();
+  const blob = new Blob([arrayBuffer], { type: "application/zip" });
+
+  const newName = fileName.replace(/\.zip$/i, "." + outputType);
+
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = newName;
+  a.click();
+
+  URL.revokeObjectURL(a.href);
+}
+</script>
 
 dropZone.addEventListener("dragover", e => {
   e.preventDefault();
