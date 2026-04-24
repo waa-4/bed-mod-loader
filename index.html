@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <title>Bed-Mod Loader</title>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
 <style>
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -101,6 +101,17 @@ button:hover {
   filter: brightness(1.2);
 }
 
+input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  background: rgba(255,255,255,0.08);
+  color: white;
+  margin-bottom: 8px;
+}
+
 .file-list, .catalog {
   margin-top: 12px;
 }
@@ -148,6 +159,7 @@ footer {
 }
 </style>
 </head>
+
 <body>
 
 <canvas id="stars"></canvas>
@@ -155,7 +167,7 @@ footer {
 
 <header>
   <h1>Bed-Mod Loader</h1>
-  <div class="subtitle">A simple Bedrock pack helper, catalog, and future mod generator.</div>
+  <div class="subtitle">A simple Bedrock pack helper, zip converter, and future mod generator.</div>
 </header>
 
 <div class="container">
@@ -164,7 +176,7 @@ footer {
     <h2>Drop Packs Here</h2>
     <div class="drop-zone" id="dropZone">
       <h3>Drag .mcpack, .mcaddon, or .zip files here</h3>
-      <p>This prototype detects files and helps organize install steps.</p>
+      <p>Zip files can be checked and renamed into Minecraft pack formats.</p>
       <input type="file" id="fileInput" multiple hidden>
       <button onclick="fileInput.click()">Choose Files</button>
     </div>
@@ -174,47 +186,37 @@ footer {
 
   <div class="card guide">
     <h2>Install Guide</h2>
-    <p class="warning">Browsers cannot auto-move files into Minecraft folders yet, but this tool can guide and organize them.</p>
+    <p class="warning">Browsers cannot auto-move files into Minecraft folders, but this tool can check and convert valid Bedrock zips.</p>
+
     <p><b>Normal Bedrock path:</b></p>
     <code>%LocalAppData%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\LocalState\games\com.mojang</code>
+
     <p>Put behavior packs in:</p>
     <code>behavior_packs</code>
+
     <p>Put resource packs in:</p>
     <code>resource_packs</code>
+  </div>
+
+  <div class="card">
+    <h2>CurseForge Search</h2>
+    <input id="curseSearch" placeholder="Search Bedrock packs...">
+    <button onclick="searchCurseForge()">Search CurseForge</button>
+    <button onclick="openBedrockPage()">Open Bedrock Page</button>
+    <p class="warning">Search opens CurseForge in a new tab. Direct downloading/search APIs may need permission or API keys.</p>
   </div>
 
   <div class="card">
     <h2>Starter Tools</h2>
     <button onclick="alert('Coming soon: starter pack generator!')">Generate Starter Pack</button>
     <button onclick="alert('Coming soon: display entity template!')">Create Display Entity</button>
-    <button onclick="alert('Coming soon: pack checker!')">Check Pack Structure</button>
-  </div>
-
-  <div class="card">
-    <h2>Mini Catalog</h2>
-    <div class="catalog">
-      <div class="catalog-item">
-        <b>Sulfur Display Pack</b><br>
-        Fake display entities for Bedrock.
-        <br><span class="badge">display</span> <span class="badge">template</span>
-      </div>
-      <div class="catalog-item">
-        <b>RustWorld Black Market Props</b><br>
-        Future fake shop displays and weird relics.
-        <br><span class="badge">rustworld</span> <span class="badge">props</span>
-      </div>
-      <div class="catalog-item">
-        <b>Command Terminal Add-on</b><br>
-        Future custom command/item system idea.
-        <br><span class="badge">tools</span> <span class="badge">experimental</span>
-      </div>
-    </div>
+    <button onclick="alert('Coming soon: deeper pack checker!')">Check Pack Structure</button>
   </div>
 
 </div>
 
 <footer>
-  Bed-Mod Loader is an unofficial helper tool. Minecraft / Roblox chaos not included.
+  Bed-Mod Loader is an unofficial helper tool. Java mods cannot magically convert into Bedrock add-ons.
 </footer>
 
 <script>
@@ -222,7 +224,8 @@ const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
 const fileList = document.getElementById("fileList");
 
-<script>
+window.pendingZipFiles = {};
+
 async function addFiles(files) {
   for (const file of files) {
     const item = document.createElement("div");
@@ -231,29 +234,55 @@ async function addFiles(files) {
     let type = "Unknown";
     let extra = "";
 
-    if (file.name.endsWith(".mcpack")) type = "Minecraft Pack";
-    if (file.name.endsWith(".mcaddon")) type = "Minecraft Add-on";
-    if (file.name.endsWith(".zip")) {
+    const lower = file.name.toLowerCase();
+
+    if (lower.endsWith(".mcpack")) {
+      type = "Minecraft Pack";
+      extra = `<br><span class="badge">Ready to import</span>`;
+    }
+
+    else if (lower.endsWith(".mcaddon")) {
+      type = "Minecraft Add-on";
+      extra = `<br><span class="badge">Ready to import</span>`;
+    }
+
+    else if (lower.endsWith(".zip")) {
       type = "Zip Archive";
 
       try {
         const zip = await JSZip.loadAsync(file);
         const names = Object.keys(zip.files);
+        const manifestFiles = names.filter(n => n.toLowerCase().endsWith("manifest.json"));
+        const manifestCount = manifestFiles.length;
 
-        const manifestCount = names.filter(n => n.endsWith("manifest.json")).length;
+        window.pendingZipFiles[file.name] = file;
 
         if (manifestCount === 1) {
-          extra = `<br><button onclick="convertZipFile('${file.name}', 'mcpack')">Convert to .mcpack</button>`;
-          window.pendingZipFiles[file.name] = file;
+          extra = `
+            <br><span class="badge">1 manifest found</span>
+            <br><span class="badge">Probably one pack</span>
+            <br><button onclick="convertZipFile('${escapeName(file.name)}', 'mcpack')">Convert to .mcpack</button>
+          `;
         } else if (manifestCount >= 2) {
-          extra = `<br><button onclick="convertZipFile('${file.name}', 'mcaddon')">Convert to .mcaddon</button>`;
-          window.pendingZipFiles[file.name] = file;
+          extra = `
+            <br><span class="badge">${manifestCount} manifests found</span>
+            <br><span class="badge">Probably BP + RP add-on</span>
+            <br><button onclick="convertZipFile('${escapeName(file.name)}', 'mcaddon')">Convert to .mcaddon</button>
+          `;
         } else {
-          extra = `<br><span class="badge">No manifest found</span>`;
+          extra = `
+            <br><span class="badge">No manifest found</span>
+            <br><span class="warning">This may not be a valid Bedrock pack.</span>
+          `;
         }
       } catch (err) {
         extra = `<br><span class="badge">Could not read zip</span>`;
       }
+    }
+
+    else if (lower.endsWith(".jar")) {
+      type = "Java Mod";
+      extra = `<br><span class="warning">Java .jar mods cannot convert into Bedrock packs.</span>`;
     }
 
     item.innerHTML = `
@@ -267,25 +296,31 @@ async function addFiles(files) {
   }
 }
 
-window.pendingZipFiles = {};
+function escapeName(name) {
+  return name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
 
 async function convertZipFile(fileName, outputType) {
   const file = window.pendingZipFiles[fileName];
-  if (!file) return alert("File not found.");
+  if (!file) {
+    alert("File not found.");
+    return;
+  }
 
   const arrayBuffer = await file.arrayBuffer();
   const blob = new Blob([arrayBuffer], { type: "application/zip" });
 
-  const newName = fileName.replace(/\.zip$/i, "." + outputType);
+  const newName = file.name.replace(/\.zip$/i, "." + outputType);
 
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = newName;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
 
-  URL.revokeObjectURL(a.href);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
-</script>
 
 dropZone.addEventListener("dragover", e => {
   e.preventDefault();
@@ -305,6 +340,21 @@ dropZone.addEventListener("drop", e => {
 fileInput.addEventListener("change", () => {
   addFiles(fileInput.files);
 });
+
+function searchCurseForge() {
+  const query = document.getElementById("curseSearch").value.trim();
+  if (!query) {
+    window.open("https://www.curseforge.com/minecraft-bedrock", "_blank");
+    return;
+  }
+
+  const url = "https://www.curseforge.com/minecraft-bedrock/search?search=" + encodeURIComponent(query);
+  window.open(url, "_blank");
+}
+
+function openBedrockPage() {
+  window.open("https://www.curseforge.com/minecraft-bedrock", "_blank");
+}
 
 /* Stars */
 const canvas = document.getElementById("stars");
