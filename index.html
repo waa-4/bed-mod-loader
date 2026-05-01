@@ -7,7 +7,9 @@
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 
 <style>
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
@@ -29,8 +31,8 @@ canvas {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 170px;
-  background: linear-gradient(to top, rgba(139,92,246,0.45), transparent);
+  height: 180px;
+  background: linear-gradient(to top, rgba(139,92,246,0.48), transparent);
   z-index: -1;
   pointer-events: none;
 }
@@ -42,7 +44,7 @@ header {
 
 h1 {
   margin: 0;
-  font-size: 42px;
+  font-size: 44px;
   color: #c4b5fd;
   text-shadow: 0 0 18px #7c3aed;
 }
@@ -53,7 +55,7 @@ h1 {
 }
 
 .container {
-  width: min(1100px, 94%);
+  width: min(1150px, 94%);
   margin: auto;
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;
@@ -65,7 +67,8 @@ h1 {
   border: 1px solid rgba(167,139,250,0.35);
   border-radius: 18px;
   padding: 18px;
-  box-shadow: 0 0 25px rgba(124,58,237,0.15);
+  box-shadow: 0 0 25px rgba(124,58,237,0.16);
+  backdrop-filter: blur(5px);
 }
 
 .card h2 {
@@ -85,6 +88,7 @@ h1 {
 .drop-zone.dragover {
   background: rgba(139,92,246,0.22);
   box-shadow: 0 0 25px #8b5cf6;
+  transform: scale(1.01);
 }
 
 button {
@@ -98,7 +102,12 @@ button {
 }
 
 button:hover {
-  filter: brightness(1.2);
+  filter: brightness(1.18);
+}
+
+button.secondary {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(167,139,250,0.35);
 }
 
 input {
@@ -112,16 +121,21 @@ input {
   margin-bottom: 8px;
 }
 
-.file-list, .catalog {
+.file-list {
   margin-top: 12px;
 }
 
-.file-item, .catalog-item {
+.file-item {
   background: rgba(255,255,255,0.06);
-  padding: 10px;
-  border-radius: 10px;
-  margin-bottom: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 10px;
   border-left: 3px solid #a78bfa;
+}
+
+.file-title {
+  font-weight: bold;
+  color: #f5f3ff;
 }
 
 .badge {
@@ -132,7 +146,33 @@ input {
   padding: 3px 8px;
   border-radius: 999px;
   font-size: 12px;
-  margin-top: 5px;
+  margin-top: 6px;
+  margin-right: 4px;
+}
+
+.badge.good {
+  background: rgba(34,197,94,0.16);
+  border-color: rgba(34,197,94,0.35);
+  color: #bbf7d0;
+}
+
+.badge.warn {
+  background: rgba(234,179,8,0.16);
+  border-color: rgba(234,179,8,0.4);
+  color: #fde68a;
+}
+
+.badge.bad {
+  background: rgba(239,68,68,0.16);
+  border-color: rgba(239,68,68,0.38);
+  color: #fecaca;
+}
+
+.details {
+  font-size: 13px;
+  color: #d8b4fe;
+  margin-top: 8px;
+  line-height: 1.45;
 }
 
 .guide code {
@@ -143,6 +183,17 @@ input {
 .warning {
   color: #fcd34d;
   font-size: 14px;
+}
+
+.small {
+  font-size: 13px;
+  color: #c4b5fd;
+}
+
+.tool-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 footer {
@@ -156,6 +207,10 @@ footer {
   .container {
     grid-template-columns: 1fr;
   }
+
+  h1 {
+    font-size: 34px;
+  }
 }
 </style>
 </head>
@@ -167,7 +222,7 @@ footer {
 
 <header>
   <h1>Bed-Mod Loader</h1>
-  <div class="subtitle">A simple Bedrock pack helper, zip converter, and future mod generator.</div>
+  <div class="subtitle">A purple Bedrock pack helper, checker, zip converter, and future mod generator.</div>
 </header>
 
 <div class="container">
@@ -175,10 +230,14 @@ footer {
   <div class="card">
     <h2>Drop Packs Here</h2>
     <div class="drop-zone" id="dropZone">
-      <h3>Drag .mcpack, .mcaddon, or .zip files here</h3>
-      <p>Zip files can be checked and renamed into Minecraft pack formats.</p>
+      <h3>Drag .mcpack, .mcaddon, .zip, or .jar files here</h3>
+      <p>Checks pack structure and converts valid Bedrock zips into Minecraft file types.</p>
       <input type="file" id="fileInput" multiple hidden>
       <button onclick="fileInput.click()">Choose Files</button>
+    </div>
+
+    <div class="tool-row">
+      <button class="secondary" onclick="clearFiles()">Clear Results</button>
     </div>
 
     <div class="file-list" id="fileList"></div>
@@ -191,11 +250,13 @@ footer {
     <p><b>Normal Bedrock path:</b></p>
     <code>%LocalAppData%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\LocalState\games\com.mojang</code>
 
-    <p>Put behavior packs in:</p>
+    <p><b>Behavior packs:</b></p>
     <code>behavior_packs</code>
 
-    <p>Put resource packs in:</p>
+    <p><b>Resource packs:</b></p>
     <code>resource_packs</code>
+
+    <p class="small">Tip: A valid pack usually has a <b>manifest.json</b> near the top of the pack folder.</p>
   </div>
 
   <div class="card">
@@ -203,20 +264,21 @@ footer {
     <input id="curseSearch" placeholder="Search Bedrock packs...">
     <button onclick="searchCurseForge()">Search CurseForge</button>
     <button onclick="openBedrockPage()">Open Bedrock Page</button>
-    <p class="warning">Search opens CurseForge in a new tab. Direct downloading/search APIs may need permission or API keys.</p>
+    <p class="warning">This opens CurseForge in a new tab. Direct built-in downloading usually needs API access or creator permission.</p>
   </div>
 
   <div class="card">
     <h2>Starter Tools</h2>
     <button onclick="alert('Coming soon: starter pack generator!')">Generate Starter Pack</button>
     <button onclick="alert('Coming soon: display entity template!')">Create Display Entity</button>
-    <button onclick="alert('Coming soon: deeper pack checker!')">Check Pack Structure</button>
+    <button onclick="alert('The checker is active: drop a zip or pack file on the left!')">Check Pack Structure</button>
+    <p class="small">Next good upgrade: a real starter pack generator that creates a downloadable zip directly in the browser.</p>
   </div>
 
 </div>
 
 <footer>
-  Bed-Mod Loader is an unofficial helper tool. Java mods cannot magically convert into Bedrock add-ons.
+  Bed-Mod Loader is unofficial. Java .jar mods cannot magically convert into Bedrock add-ons.
 </footer>
 
 <script>
@@ -226,6 +288,108 @@ const fileList = document.getElementById("fileList");
 
 window.pendingZipFiles = {};
 
+function clearFiles() {
+  fileList.innerHTML = "";
+  window.pendingZipFiles = {};
+}
+
+function escapeName(name) {
+  return name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function normalizePath(path) {
+  return path.replace(/\\/g, "/").toLowerCase();
+}
+
+function detectPackKind(fileNames) {
+  const names = fileNames.map(normalizePath);
+
+  const hasManifest = names.some(n => n.endsWith("manifest.json"));
+
+  const hasEntities = names.some(n => n.includes("/entities/") || n.startsWith("entities/"));
+  const hasFunctions = names.some(n => n.includes("/functions/") || n.startsWith("functions/"));
+  const hasLootTables = names.some(n => n.includes("/loot_tables/") || n.startsWith("loot_tables/"));
+  const hasRecipes = names.some(n => n.includes("/recipes/") || n.startsWith("recipes/"));
+
+  const hasTextures = names.some(n => n.includes("/textures/") || n.startsWith("textures/"));
+  const hasModels = names.some(n => n.includes("/models/") || n.startsWith("models/"));
+  const hasClientEntity = names.some(n => n.includes("/entity/") || n.startsWith("entity/"));
+  const hasSounds = names.some(n => n.includes("/sounds/") || n.startsWith("sounds/"));
+
+  let kind = "Unknown Bedrock Pack";
+  let confidence = "warn";
+  let reasons = [];
+
+  if (!hasManifest) {
+    return {
+      kind: "Not a valid Bedrock pack yet",
+      confidence: "bad",
+      reasons: ["No manifest.json found."]
+    };
+  }
+
+  if (hasEntities || hasFunctions || hasLootTables || hasRecipes) {
+    kind = "Behavior Pack";
+    confidence = "good";
+    if (hasEntities) reasons.push("Has entities folder.");
+    if (hasFunctions) reasons.push("Has functions folder.");
+    if (hasLootTables) reasons.push("Has loot_tables folder.");
+    if (hasRecipes) reasons.push("Has recipes folder.");
+  }
+
+  if (hasTextures || hasModels || hasClientEntity || hasSounds) {
+    if (kind === "Behavior Pack") {
+      kind = "Mixed Pack / Add-on Folder";
+      confidence = "warn";
+    } else {
+      kind = "Resource Pack";
+      confidence = "good";
+    }
+
+    if (hasTextures) reasons.push("Has textures folder.");
+    if (hasModels) reasons.push("Has models folder.");
+    if (hasClientEntity) reasons.push("Has client entity folder.");
+    if (hasSounds) reasons.push("Has sounds folder.");
+  }
+
+  if (reasons.length === 0) {
+    reasons.push("Has manifest.json, but no obvious BP/RP folders found.");
+  }
+
+  return { kind, confidence, reasons };
+}
+
+async function analyzeZip(file) {
+  const zip = await JSZip.loadAsync(file);
+  const names = Object.keys(zip.files);
+  const manifestFiles = names.filter(n => normalizePath(n).endsWith("manifest.json"));
+  const manifestCount = manifestFiles.length;
+
+  const detector = detectPackKind(names);
+
+  let suggestedOutput = null;
+  let outputReason = "";
+
+  if (manifestCount === 1) {
+    suggestedOutput = "mcpack";
+    outputReason = "1 manifest found, so this is probably one pack.";
+  } else if (manifestCount >= 2) {
+    suggestedOutput = "mcaddon";
+    outputReason = manifestCount + " manifests found, so this is probably multiple packs.";
+  } else {
+    outputReason = "No manifest found, so conversion is not recommended.";
+  }
+
+  return {
+    names,
+    manifestFiles,
+    manifestCount,
+    detector,
+    suggestedOutput,
+    outputReason
+  };
+}
+
 async function addFiles(files) {
   for (const file of files) {
     const item = document.createElement("div");
@@ -233,60 +397,64 @@ async function addFiles(files) {
 
     let type = "Unknown";
     let extra = "";
-
     const lower = file.name.toLowerCase();
 
     if (lower.endsWith(".mcpack")) {
       type = "Minecraft Pack";
-      extra = `<br><span class="badge">Ready to import</span>`;
+      extra = `
+        <br><span class="badge good">Ready to import</span>
+        <div class="details">This should be a single Bedrock pack. If it fails, rename it to .zip and drop it here to inspect the inside.</div>
+      `;
     }
 
     else if (lower.endsWith(".mcaddon")) {
       type = "Minecraft Add-on";
-      extra = `<br><span class="badge">Ready to import</span>`;
+      extra = `
+        <br><span class="badge good">Ready to import</span>
+        <div class="details">This usually contains both behavior and resource packs.</div>
+      `;
+    }
+
+    else if (lower.endsWith(".jar")) {
+      type = "Java Mod";
+      extra = `
+        <br><span class="badge bad">Not convertible</span>
+        <div class="details">Java .jar mods are for Java Edition mod loaders like Forge/Fabric. They cannot be renamed into Bedrock packs.</div>
+      `;
     }
 
     else if (lower.endsWith(".zip")) {
       type = "Zip Archive";
 
       try {
-        const zip = await JSZip.loadAsync(file);
-        const names = Object.keys(zip.files);
-        const manifestFiles = names.filter(n => n.toLowerCase().endsWith("manifest.json"));
-        const manifestCount = manifestFiles.length;
-
+        const result = await analyzeZip(file);
         window.pendingZipFiles[file.name] = file;
 
-        if (manifestCount === 1) {
-          extra = `
-            <br><span class="badge">1 manifest found</span>
-            <br><span class="badge">Probably one pack</span>
-            <br><button onclick="convertZipFile('${escapeName(file.name)}', 'mcpack')">Convert to .mcpack</button>
-          `;
-        } else if (manifestCount >= 2) {
-          extra = `
-            <br><span class="badge">${manifestCount} manifests found</span>
-            <br><span class="badge">Probably BP + RP add-on</span>
-            <br><button onclick="convertZipFile('${escapeName(file.name)}', 'mcaddon')">Convert to .mcaddon</button>
-          `;
+        const badgeClass = result.detector.confidence;
+        const reasonList = result.detector.reasons.map(r => `<li>${r}</li>`).join("");
+
+        extra = `
+          <br><span class="badge ${badgeClass}">${result.detector.kind}</span>
+          <span class="badge">${result.manifestCount} manifest(s)</span>
+          <div class="details">
+            ${result.outputReason}
+            <ul>${reasonList}</ul>
+          </div>
+        `;
+
+        if (result.suggestedOutput) {
+          extra += `<button onclick="convertZipFile('${escapeName(file.name)}', '${result.suggestedOutput}')">Convert to .${result.suggestedOutput}</button>`;
         } else {
-          extra = `
-            <br><span class="badge">No manifest found</span>
-            <br><span class="warning">This may not be a valid Bedrock pack.</span>
-          `;
+          extra += `<br><span class="badge bad">Conversion not recommended</span>`;
         }
+
       } catch (err) {
-        extra = `<br><span class="badge">Could not read zip</span>`;
+        extra = `<br><span class="badge bad">Could not read zip</span>`;
       }
     }
 
-    else if (lower.endsWith(".jar")) {
-      type = "Java Mod";
-      extra = `<br><span class="warning">Java .jar mods cannot convert into Bedrock packs.</span>`;
-    }
-
     item.innerHTML = `
-      <b>${file.name}</b><br>
+      <div class="file-title">${file.name}</div>
       Size: ${(file.size / 1024).toFixed(1)} KB<br>
       <span class="badge">${type}</span>
       ${extra}
@@ -294,10 +462,6 @@ async function addFiles(files) {
 
     fileList.appendChild(item);
   }
-}
-
-function escapeName(name) {
-  return name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
 
 async function convertZipFile(fileName, outputType) {
@@ -368,20 +532,21 @@ resize();
 addEventListener("resize", resize);
 
 const stars = [];
-for (let i = 0; i < 120; i++) {
+for (let i = 0; i < 130; i++) {
   stars.push({
     x: Math.random() * innerWidth,
     y: Math.random() * innerHeight,
-    r: Math.random() * 1.8 + 0.4,
-    s: Math.random() * 0.25 + 0.05
+    r: Math.random() * 1.8 + 0.35,
+    s: Math.random() * 0.25 + 0.05,
+    alpha: Math.random() * 0.7 + 0.3
   });
 }
 
 function drawStars() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = "#c4b5fd";
 
   for (const star of stars) {
+    ctx.fillStyle = `rgba(196,181,253,${star.alpha})`;
     ctx.beginPath();
     ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
     ctx.fill();
