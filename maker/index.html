@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bed-Mod Maker</title>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="stars"></canvas>
+  <div class="bottom-glow"></div>
+
+  <header class="hero">
+    <div class="pill">/bed-mod-loader/maker</div>
+    <h1>Bed-Mod Maker</h1>
+    <p>Create simple Minecraft Bedrock add-on zips right in your browser.</p>
+    <div class="hero-actions">
+      <button onclick="exportAddon()">Export Add-on Zip</button>
+      <button class="ghost" onclick="downloadSampleStructureNote()">Structure Help</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+    <aside class="sidebar card">
+      <button class="tab active" data-tab="project">Project</button>
+      <button class="tab" data-tab="items">Items</button>
+      <button class="tab" data-tab="recipes">Recipes</button>
+      <button class="tab" data-tab="structures">Structures</button>
+      <button class="tab" data-tab="functions">Functions</button>
+      <button class="tab" data-tab="export">Export</button>
+      <hr />
+      <button class="danger-lite" onclick="resetProject()">Reset Maker</button>
+    </aside>
+
+    <section class="workspace">
+      <section class="panel card active" id="tab-project">
+        <h2>Project Setup</h2>
+        <p class="muted">This creates a paired Behavior Pack + Resource Pack and downloads them inside one zip.</p>
+        <div class="grid two">
+          <label>Project Name<input id="projectName" value="Derp Addon" /></label>
+          <label>Namespace<input id="namespace" value="derp" /></label>
+          <label>Author<input id="author" value="waa-4" /></label>
+          <label>Description<input id="description" value="Made with Bed-Mod Maker" /></label>
+          <label>Minimum Engine Version<input id="minEngine" value="1.20.30" /></label>
+          <label>Zip File Name<input id="zipName" value="DerpAddon.zip" /></label>
+        </div>
+        <div class="notice">
+          <b>Tip:</b> Namespace should be simple lowercase text like <code>derp</code>, <code>sibo</code>, or <code>hellmode</code>. Identifiers become things like <code>derp:black_pixel</code>.
+        </div>
+      </section>
+
+      <section class="panel card" id="tab-items">
+        <h2>Item Creator</h2>
+        <p class="muted">Creates BP item JSON + RP item texture data. Great for simple tools, collectibles, and crafting ingredients.</p>
+        <div class="grid three">
+          <label>Item ID<input id="itemId" value="black_pixel" /></label>
+          <label>Display Name<input id="itemName" value="Black Pixel" /></label>
+          <label>Max Stack<input id="itemStack" type="number" min="1" max="64" value="64" /></label>
+          <label>Category
+            <select id="itemCategory">
+              <option>Items</option>
+              <option>Equipment</option>
+              <option>Nature</option>
+              <option>Construction</option>
+            </select>
+          </label>
+          <label>Texture Color<input id="itemColor" type="color" value="#111111" /></label>
+          <label>Texture Style
+            <select id="itemTextureStyle">
+              <option value="pixel">Single pixel icon</option>
+              <option value="gem">Tiny gem icon</option>
+              <option value="orb">Orb icon</option>
+            </select>
+          </label>
+        </div>
+        <button onclick="addItem()">Add Item</button>
+        <div class="list" id="itemsList"></div>
+      </section>
+
+      <section class="panel card" id="tab-recipes">
+        <h2>Recipe Creator</h2>
+        <p class="muted">Creates shapeless or shaped crafting recipes. Use vanilla IDs like <code>minecraft:stick</code> or your custom IDs like <code>derp:black_pixel</code>.</p>
+        <div class="grid two">
+          <label>Recipe ID<input id="recipeId" value="black_pixel_from_stick" /></label>
+          <label>Result Item<input id="recipeResult" value="derp:black_pixel" /></label>
+          <label>Result Count<input id="recipeCount" type="number" min="1" max="64" value="1" /></label>
+          <label>Recipe Type
+            <select id="recipeType" onchange="syncRecipeMode()">
+              <option value="shapeless">Shapeless</option>
+              <option value="shaped">Shaped 3x3</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="shapelessBox">
+          <label>Ingredients, one per line<textarea id="recipeIngredients">minecraft:stick</textarea></label>
+        </div>
+
+        <div id="shapedBox" class="hidden">
+          <p class="small-title">Pattern</p>
+          <div class="recipe-grid">
+            <input maxlength="1" id="p00"><input maxlength="1" id="p01"><input maxlength="1" id="p02">
+            <input maxlength="1" id="p10"><input maxlength="1" id="p11"><input maxlength="1" id="p12">
+            <input maxlength="1" id="p20"><input maxlength="1" id="p21"><input maxlength="1" id="p22">
+          </div>
+          <label>Key Map, one per line like <code>A=minecraft:stick</code><textarea id="recipeKeyMap">A=minecraft:stick</textarea></label>
+        </div>
+
+        <button onclick="addRecipe()">Add Recipe</button>
+        <div class="list" id="recipesList"></div>
+      </section>
+
+      <section class="panel card" id="tab-structures">
+        <h2>Structure Spawning</h2>
+        <p class="muted">Upload existing <code>.mcstructure</code> files or create function placeholders that load structures by command.</p>
+        <div class="drop-zone" id="structureDrop">
+          <h3>Drop .mcstructure files here</h3>
+          <p>They will be placed in <code>BP/structures/</code> inside the exported zip.</p>
+          <input id="structureInput" type="file" accept=".mcstructure" multiple hidden />
+          <button onclick="structureInput.click()">Choose Structures</button>
+        </div>
+
+        <div class="grid two top-gap">
+          <label>Function Name<input id="structureFunctionName" value="spawn_structure" /></label>
+          <label>Structure ID / File Name<input id="structureName" value="derp_house" /></label>
+          <label>X Offset<input id="structureX" type="number" value="0" /></label>
+          <label>Y Offset<input id="structureY" type="number" value="0" /></label>
+          <label>Z Offset<input id="structureZ" type="number" value="0" /></label>
+          <label>Run At
+            <select id="structureTarget">
+              <option value="@p">nearest player</option>
+              <option value="@a">all players</option>
+              <option value="@s">command runner</option>
+            </select>
+          </label>
+        </div>
+        <button onclick="addStructureFunction()">Add Structure Spawn Function</button>
+        <div class="notice">
+          To use it in-game, run something like <code>/function spawn_structure</code>. Your structure ID becomes <code>namespace:file_name</code> unless you type a full <code>namespace:name</code> yourself.
+        </div>
+        <div class="list" id="structuresList"></div>
+      </section>
+
+      <section class="panel card" id="tab-functions">
+        <h2>Function Creator</h2>
+        <p class="muted">Create simple <code>.mcfunction</code> command files. One command per line. Do not include the slash.</p>
+        <div class="grid two">
+          <label>Function Name<input id="functionName" value="hello_derp" /></label>
+          <label>Template
+            <select id="functionTemplate" onchange="applyFunctionTemplate()">
+              <option value="custom">Custom</option>
+              <option value="give">Give custom item</option>
+              <option value="lightning">Lightning around player</option>
+              <option value="night">Set night</option>
+            </select>
+          </label>
+        </div>
+        <label>Commands<textarea id="functionCommands">say Bed-Mod Maker exported this function!</textarea></label>
+        <button onclick="addFunction()">Add Function</button>
+        <div class="list" id="functionsList"></div>
+      </section>
+
+      <section class="panel card" id="tab-export">
+        <h2>Export Preview</h2>
+        <p class="muted">This is what will be added to the zip. The app builds everything locally in your browser.</p>
+        <div class="stats">
+          <div><b id="statItems">0</b><span>Items</span></div>
+          <div><b id="statRecipes">0</b><span>Recipes</span></div>
+          <div><b id="statStructures">0</b><span>Structures</span></div>
+          <div><b id="statFunctions">0</b><span>Functions</span></div>
+        </div>
+        <button onclick="exportAddon()">Download Zip</button>
+        <button class="ghost" onclick="renderFileTree()">Refresh File Tree</button>
+        <pre id="fileTree"></pre>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    Unofficial Bedrock add-on helper. Exported packs are starter templates, not magic Java-to-Bedrock converters.
+  </footer>
+
+  <script src="maker.js"></script>
+</body>
+</html>
