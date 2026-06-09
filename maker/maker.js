@@ -1,578 +1,167 @@
+const $ = (id) => document.getElementById(id);
 const state = {
-  items: [],
-  recipes: [],
-  structures: [],
-  functions: []
+  selectedFunction: null,
+  paintMode: 'pencil',
+  pixels: Array.from({ length: 16 }, () => Array(16).fill('#00000000')),
+  functions: {}, items: [], recipes: [], structures: [], blocks: [], biomes: [], worlds: []
 };
 
-const $ = (id) => document.getElementById(id);
+const cmdDefs = {
+  give: { label:'Give Item', fields:[['item','Item ID','minecraft:diamond'],['count','Count','1']], build:v=>`give ${v.target} ${v.item} ${v.count}` },
+  summon: { label:'Summon Entity', fields:[['entity','Entity ID','minecraft:zombie'],['pos','Position','~ ~ ~']], build:v=>`summon ${v.entity} ${v.pos}` },
+  tp: { label:'Teleport', fields:[['pos','Position / Target','~ ~5 ~']], build:v=>`tp ${v.target} ${v.pos}` },
+  effect: { label:'Effect', fields:[['effect','Effect','speed'],['seconds','Seconds','10'],['level','Amplifier','1']], build:v=>`effect ${v.target} ${v.effect} ${v.seconds} ${v.level} true` },
+  gamemode: { label:'Gamemode', fields:[['mode','Mode','creative']], build:v=>`gamemode ${v.mode} ${v.target}` },
+  time: { label:'Time Set', fields:[['time','Time','night']], build:v=>`time set ${v.time}` },
+  weather: { label:'Weather', fields:[['weather','Weather','clear'],['duration','Duration','999999']], build:v=>`weather ${v.weather} ${v.duration}` },
+  structure: { label:'Structure Load', fields:[['name','Structure Name','my_house'],['pos','Position','~ ~ ~']], build:v=>`structure load ${v.name} ${v.pos}` },
+  setblock: { label:'Set Block', fields:[['pos','Position','~ ~ ~'],['block','Block ID','minecraft:diamond_block']], build:v=>`setblock ${v.pos} ${v.block}` },
+  fill: { label:'Fill Area', fields:[['from','From','~ ~ ~'],['to','To','~5 ~5 ~5'],['block','Block ID','minecraft:stone']], build:v=>`fill ${v.from} ${v.to} ${v.block}` },
+  playsound: { label:'Play Sound', fields:[['sound','Sound','random.levelup'],['pos','Position','~ ~ ~']], build:v=>`playsound ${v.sound} ${v.target} ${v.pos}` },
+  title: { label:'Title', fields:[['slot','Title Slot','title'],['text','Text','Hello!']], build:v=>`titleraw ${v.target} ${v.slot} {"rawtext":[{"text":"${escapeJson(v.text)}"}]}` },
+  scoreboard: { label:'Scoreboard Add', fields:[['objective','Objective','coins'],['score','Score','1']], build:v=>`scoreboard players add ${v.target} ${v.objective} ${v.score}` },
+  execute: { label:'Execute Command', fields:[['as','As','@p'],['at','At','@s'],['run','Run','say executed']], build:v=>`execute as ${v.as} at ${v.at} run ${v.run}` },
+  function: { label:'Run Function', fields:[['function','Function Name','starter_function']], build:v=>`function ${v.function}` }
+};
 
-function slugify(value, fallback = "derp") {
-  const clean = String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_\- ]/g, "")
-    .replace(/\s+/g, "_")
-    .replace(/-+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return clean || fallback;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+function cleanId(v){ return String(v||'thing').toLowerCase().replace(/[^a-z0-9_]+/g,'_').replace(/^_+|_+$/g,'') || 'thing'; }
+function ns(){ return cleanId($('namespace').value || 'derp'); }
+function project(){ return cleanId($('projectName').value || 'addon'); }
+function escapeJson(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/"/g,'\\"'); }
+function uuid(){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15; return (c==='x'?r:(r&3|8)).toString(16);}); }
+function pretty(o){ return JSON.stringify(o,null,2); }
+
+// tabs
+for(const b of document.querySelectorAll('.tab')) b.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active')); b.classList.add('active'); $(b.dataset.tab).classList.add('active'); if(b.dataset.tab==='export') renderExportPreview(); };
+
+// commands
+function initCommands(){
+  $('cmdType').innerHTML = Object.entries(cmdDefs).map(([k,d])=>`<option value="${k}">${d.label}</option>`).join('');
+  $('cmdType').onchange = renderCmdFields;
+  ['cmdTarget','cmdAmount'].forEach(id=>$(id).oninput=buildCommand);
+  renderCmdFields();
+}
+function renderCmdFields(){
+  const def = cmdDefs[$('cmdType').value];
+  $('cmdFields').innerHTML = def.fields.map(f=>`<label>${f[1]}<input data-cmdfield="${f[0]}" value="${f[2]}"></label>`).join('');
+  document.querySelectorAll('[data-cmdfield]').forEach(i=>i.oninput=buildCommand);
+  buildCommand();
+}
+function buildCommand(){
+  const def = cmdDefs[$('cmdType').value];
+  const v = { target:$('cmdTarget').value, amount:$('cmdAmount').value };
+  document.querySelectorAll('[data-cmdfield]').forEach(i=>v[i.dataset.cmdfield]=i.value);
+  $('cmdOutput').value = def.build(v);
+}
+$('copyCmdBtn').onclick=async()=>{ await navigator.clipboard.writeText($('cmdOutput').value); toast('Command copied'); };
+$('addCmdToFunctionBtn').onclick=()=>{ if(!state.selectedFunction) createFunction(); state.functions[state.selectedFunction].push($('cmdOutput').value); renderFunctions(); toast('Added to function'); };
+$('addCmdToItemBtn').onclick=()=>{ $('itemUseCommand').value = $('cmdOutput').value; document.querySelector('[data-tab="items"]').click(); toast('Put command in item use box'); };
+
+// functions
+function createFunction(){ const name=cleanId($('functionName').value); if(!state.functions[name]) state.functions[name]=[]; state.selectedFunction=name; renderFunctions(); return name; }
+$('createFunctionBtn').onclick=()=>{ createFunction(); toast('Function selected'); };
+$('addManualCommandBtn').onclick=()=>{ if(!state.selectedFunction) createFunction(); const c=$('manualCommand').value.trim(); if(c) state.functions[state.selectedFunction].push(c); $('manualCommand').value=''; renderFunctions(); };
+$('deleteFunctionBtn').onclick=()=>{ if(state.selectedFunction){ delete state.functions[state.selectedFunction]; state.selectedFunction=Object.keys(state.functions)[0]||null; renderFunctions(); } };
+$('saveFunctionTextBtn').onclick=()=>{ if(!state.selectedFunction) return; state.functions[state.selectedFunction]=$('functionText').value.split('\n').map(x=>x.trim()).filter(Boolean); renderFunctions(); toast('Function saved'); };
+function renderFunctions(){
+  const names = Object.keys(state.functions);
+  $('functionList').innerHTML = names.map(n=>`<div class="listItem"><b>${n}</b><div>${state.functions[n].length} command(s)</div><div class="mini"><button data-selfn="${n}">Select</button></div></div>`).join('') || '<p>No functions yet.</p>';
+  document.querySelectorAll('[data-selfn]').forEach(b=>b.onclick=()=>{ state.selectedFunction=b.dataset.selfn; renderFunctions(); });
+  $('functionText').value = state.selectedFunction ? (state.functions[state.selectedFunction]||[]).join('\n') : '';
+  renderFunctionSelects(); renderExportPreview(false);
+}
+function renderFunctionSelects(){
+  const opts = '<option value="">None</option>' + Object.keys(state.functions).map(n=>`<option value="${n}">${n}</option>`).join('');
+  $('itemUseFunction').innerHTML = opts;
 }
 
-function safeFileName(value, fallback = "addon") {
-  return String(value || fallback).replace(/[\\/:*?"<>|]/g, "_").trim() || fallback;
+// pixel texture
+const canvas=$('pixelCanvas'), ctx=canvas.getContext('2d');
+function drawPixels(){ ctx.clearRect(0,0,512,512); for(let y=0;y<16;y++) for(let x=0;x<16;x++){ const c=state.pixels[y][x]; if(c && c!=='#00000000'){ ctx.fillStyle=c; ctx.fillRect(x*32,y*32,32,32); } ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.strokeRect(x*32,y*32,32,32); } }
+function pixelAt(e){ const r=canvas.getBoundingClientRect(); return {x:Math.floor((e.clientX-r.left)/r.width*16), y:Math.floor((e.clientY-r.top)/r.height*16)}; }
+function paint(e){ const p=pixelAt(e); if(p.x<0||p.y<0||p.x>15||p.y>15)return; if(state.paintMode==='fill'){ const old=state.pixels[p.y][p.x]; flood(p.x,p.y,old,$('paintColor').value); } else state.pixels[p.y][p.x]=state.paintMode==='eraser'?'#00000000':$('paintColor').value; drawPixels(); }
+function flood(x,y,old,nw){ if(old===nw)return; const q=[[x,y]]; while(q.length){ const [cx,cy]=q.pop(); if(cx<0||cy<0||cx>15||cy>15||state.pixels[cy][cx]!==old)continue; state.pixels[cy][cx]=nw; q.push([cx+1,cy],[cx-1,cy],[cx,cy+1],[cx,cy-1]); }}
+let mouseDown=false; canvas.onmousedown=e=>{mouseDown=true; paint(e)}; window.onmouseup=()=>mouseDown=false; canvas.onmousemove=e=>{ if(mouseDown && state.paintMode!=='fill') paint(e); };
+for(const [id,mode] of [['pencilBtn','pencil'],['eraserBtn','eraser'],['fillBtn','fill']]) $(id).onclick=()=>{state.paintMode=mode; document.querySelectorAll('#pencilBtn,#eraserBtn,#fillBtn').forEach(b=>b.classList.remove('selected')); $(id).classList.add('selected');};
+$('clearCanvasBtn').onclick=()=>{ state.pixels=Array.from({length:16},()=>Array(16).fill('#00000000')); drawPixels(); };
+$('downloadPngBtn').onclick=()=>downloadDataUrl('bed_mod_texture.png', makeTextureDataUrl());
+function makeTextureDataUrl(){ const c=document.createElement('canvas'); c.width=16;c.height=16; const x=c.getContext('2d'); for(let y=0;y<16;y++) for(let i=0;i<16;i++){ const col=state.pixels[y][i]; if(col && col!=='#00000000'){x.fillStyle=col;x.fillRect(i,y,1,1);} } return c.toDataURL('image/png'); }
+function autoTexture(color){ const c=document.createElement('canvas'); c.width=16;c.height=16; const x=c.getContext('2d'); x.fillStyle=color; x.fillRect(1,1,14,14); x.fillStyle='rgba(255,255,255,.35)'; x.fillRect(2,2,5,2); x.fillStyle='rgba(0,0,0,.35)'; x.fillRect(10,10,4,4); return c.toDataURL('image/png'); }
+function downloadDataUrl(name,url){ const a=document.createElement('a'); a.href=url; a.download=name; a.click(); }
+
+// items/weapons
+$('addItemBtn').onclick=()=>{ addItem({ id:cleanId($('itemId').value), name:$('itemName').value, stack:+$('itemStack').value||1, category:$('itemCategory').value, cooldownOn:$('itemCooldownOn').checked, cooldown:+$('itemCooldown').value||0, useOn:$('itemUseOn').checked, useFunction:$('itemUseFunction').value, useCommand:$('itemUseCommand').value.trim(), texture:$('itemTextureSource').value==='pixel'?makeTextureDataUrl():autoTexture($('itemColor').value), color:$('itemColor').value, damage:0, durability:0 }); };
+function addItem(item){ const i=state.items.findIndex(x=>x.id===item.id); if(i>=0) state.items[i]=item; else state.items.push(item); renderItems(); toast('Item saved'); }
+function renderItems(){ $('itemList').innerHTML = state.items.map(it=>`<div class="listItem"><b>${ns()}:${it.id}</b> — ${it.name}<div>Stack ${it.stack}, cooldown ${it.cooldownOn?it.cooldown+'s':'none'}, ${it.useOn?'has use action':'no use action'}</div><div class="mini"><button data-edititem="${it.id}">Edit</button><button data-delitem="${it.id}">Delete</button></div></div>`).join('') || '<p>No items yet.</p>'; document.querySelectorAll('[data-delitem]').forEach(b=>b.onclick=()=>{state.items=state.items.filter(x=>x.id!==b.dataset.delitem); renderItems();}); document.querySelectorAll('[data-edititem]').forEach(b=>b.onclick=()=>{const it=state.items.find(x=>x.id===b.dataset.edititem); $('itemId').value=it.id;$('itemName').value=it.name;$('itemStack').value=it.stack;$('itemCooldownOn').checked=it.cooldownOn;$('itemCooldown').value=it.cooldown;$('itemUseOn').checked=it.useOn;$('itemUseFunction').value=it.useFunction||'';$('itemUseCommand').value=it.useCommand||'';}); renderExportPreview(false); }
+$('addWeaponBtn').onclick=()=>{ const id=cleanId($('weaponId').value); const cmdLines=$('weaponCommands').value.split('\n').map(x=>x.trim()).filter(Boolean); if($('weaponType').value==='Lightning Tool') cmdLines.push('execute at @s run summon minecraft:lightning_bolt ~ ~ ~'); if($('weaponType').value==='Gun-ish Item') cmdLines.push('execute at @s run particle minecraft:basic_flame_particle ^ ^1 ^5'); addItem({ id, name:$('weaponName').value, stack:1, category:'Equipment', cooldownOn:true, cooldown:+$('weaponCooldown').value||1, useOn:cmdLines.length>0, useFunction:'', useCommand:cmdLines.join('\n'), texture:autoTexture('#ffcf4a'), color:'#ffcf4a', damage:+$('weaponDamage').value||0, durability:+$('weaponDurability').value||0, weaponType:$('weaponType').value }); document.querySelector('[data-tab="items"]').click(); };
+
+// recipes
+function initCraft(){ $('craftGrid').innerHTML = Array.from({length:9},(_,i)=>`<input placeholder="${i+1}" />`).join(''); }
+$('addShapelessBtn').onclick=()=>{ const id=cleanId($('recipeId').value); state.recipes=state.recipes.filter(r=>r.id!==id); state.recipes.push({type:'shapeless',id,result:$('recipeResult').value.trim(),count:+$('recipeCount').value||1,ingredients:$('recipeIngredients').value.split('\n').map(x=>x.trim()).filter(Boolean)}); renderRecipes(); };
+$('addShapedBtn').onclick=()=>{ const id=cleanId($('recipeId').value); state.recipes=state.recipes.filter(r=>r.id!==id); const cells=[...document.querySelectorAll('#craftGrid input')].map(i=>i.value.trim()); state.recipes.push({type:'shaped',id,result:$('recipeResult').value.trim(),count:+$('recipeCount').value||1,cells}); renderRecipes(); };
+function renderRecipes(){ $('recipeList').innerHTML=state.recipes.map(r=>`<div class="listItem"><b>${r.id}</b> ${r.type} → <code>${r.result}</code><div class="mini"><button data-delrecipe="${r.id}">Delete</button></div></div>`).join('')||'<p>No recipes yet.</p>'; document.querySelectorAll('[data-delrecipe]').forEach(b=>b.onclick=()=>{state.recipes=state.recipes.filter(x=>x.id!==b.dataset.delrecipe);renderRecipes();}); renderExportPreview(false); }
+
+// structures
+$('makeStructureCommandBtn').onclick=()=>{ $('structureCommand').value=`structure load ${cleanId($('structureName').value)} ${$('structureOffset').value||'~ ~ ~'}`; };
+$('addStructureBtn').onclick=async()=>{ const f=$('structureFile').files[0]; if(!f){toast('Choose a .mcstructure file first');return;} const id=cleanId($('structureName').value); const data=await f.arrayBuffer(); state.structures=state.structures.filter(s=>s.id!==id); state.structures.push({id, offset:$('structureOffset').value||'~ ~ ~', data, fileName:f.name}); renderStructures(); toast('Structure added'); };
+function renderStructures(){ $('structureList').innerHTML=state.structures.map(s=>`<div class="listItem"><b>${s.id}</b> from ${s.fileName}<br><code>structure load ${s.id} ${s.offset}</code><div class="mini"><button data-addstructfn="${s.id}">Add Spawn Function</button><button data-delstruct="${s.id}">Delete</button></div></div>`).join('')||'<p>No structures yet.</p>'; document.querySelectorAll('[data-delstruct]').forEach(b=>b.onclick=()=>{state.structures=state.structures.filter(x=>x.id!==b.dataset.delstruct);renderStructures();}); document.querySelectorAll('[data-addstructfn]').forEach(b=>b.onclick=()=>{const s=state.structures.find(x=>x.id===b.dataset.addstructfn); state.functions[`spawn_${s.id}`]=[`structure load ${s.id} ${s.offset}`]; state.selectedFunction=`spawn_${s.id}`; renderFunctions(); toast('Spawn function created');}); renderExportPreview(false); }
+
+// blocks
+$('addBlockBtn').onclick=()=>{ const id=cleanId($('blockId').value); state.blocks=state.blocks.filter(b=>b.id!==id); state.blocks.push({id,name:$('blockName').value,destroy:+$('blockDestroy').value||1,explosion:+$('blockExplosion').value||1,light:+$('blockLight').value||0,friction:+$('blockFriction').value||0.6,collision:$('blockCollision').checked,color:$('blockColor').value,drop:$('blockDrop').value||'self'}); renderBlocks(); toast('Block saved'); };
+function renderBlocks(){ $('blockList').innerHTML=state.blocks.map(b=>`<div class="listItem"><b>${ns()}:${b.id}</b> — ${b.name}<div>Light ${b.light}, destroy ${b.destroy}, collision ${b.collision?'on':'off'}</div><div class="mini"><button data-delblock="${b.id}">Delete</button></div></div>`).join('')||'<p>No blocks yet.</p>'; document.querySelectorAll('[data-delblock]').forEach(x=>x.onclick=()=>{state.blocks=state.blocks.filter(b=>b.id!==x.dataset.delblock);renderBlocks();}); renderExportPreview(false); }
+
+// biomes
+$('addBiomeBtn').onclick=()=>{ const id=cleanId($('biomeId').value); state.biomes=state.biomes.filter(b=>b.id!==id); state.biomes.push({id,name:$('biomeName').value,temp:+$('biomeTemp').value||0,downfall:+$('biomeDownfall').value||0,grass:$('biomeGrass').value,sky:$('biomeSky').value,surface:$('biomeSurface').value,under:$('biomeUnder').value,tags:$('biomeTags').value.split(',').map(x=>x.trim()).filter(Boolean)}); renderBiomes(); };
+function renderBiomes(){ $('biomeList').innerHTML=state.biomes.map(b=>`<div class="listItem"><b>${ns()}:${b.id}</b> — ${b.name}<div>Temp ${b.temp}, downfall ${b.downfall}, surface ${b.surface}</div><div class="mini"><button data-delbiome="${b.id}">Delete</button></div></div>`).join('')||'<p>No biomes yet.</p>'; document.querySelectorAll('[data-delbiome]').forEach(x=>x.onclick=()=>{state.biomes=state.biomes.filter(b=>b.id!==x.dataset.delbiome);renderBiomes();}); renderExportPreview(false); }
+
+// worlds
+$('saveWorldPresetBtn').onclick=()=>{ const name=$('worldName').value; state.worlds=state.worlds.filter(w=>w.name!==name); state.worlds.push({name,type:$('worldType').value,gamemode:$('worldGamemode').value,difficulty:$('worldDifficulty').value,items:$('worldItems').value,layers:$('worldLayers').value}); renderWorlds(); };
+function renderWorlds(){ $('worldList').innerHTML=state.worlds.map(w=>`<div class="listItem"><b>${w.name}</b> — ${w.type}<div>Gamemode ${w.gamemode}, difficulty ${w.difficulty}</div><div class="mini"><button data-delworld="${w.name}">Delete</button></div></div>`).join('')||'<p>No world presets yet.</p>'; document.querySelectorAll('[data-delworld]').forEach(x=>x.onclick=()=>{state.worlds=state.worlds.filter(w=>w.name!==x.dataset.delworld);renderWorlds();}); renderExportPreview(false); }
+
+// export generation
+function itemJson(it){ const c={
+  'minecraft:max_stack_size': Math.max(1,Math.min(64,it.stack||1)),
+  'minecraft:icon': it.id
+}; if(it.cooldownOn) c['minecraft:cooldown']={category:`${ns()}_${it.id}`,duration:it.cooldown||1}; if(it.damage) c['minecraft:damage']=it.damage; if(it.durability) c['minecraft:durability']={max_durability:it.durability}; return {format_version:'1.21.70','minecraft:item':{description:{identifier:`${ns()}:${it.id}`,menu_category:{category:it.category||'Items'}},components:c}}; }
+function blockJson(b){ return {format_version:'1.21.70','minecraft:block':{description:{identifier:`${ns()}:${b.id}`,menu_category:{category:'construction'}},components:{'minecraft:destroy_time':b.destroy,'minecraft:explosion_resistance':b.explosion,'minecraft:light_emission':b.light,'minecraft:friction':b.friction,'minecraft:collision_box':b.collision,'minecraft:selection_box':true,'minecraft:material_instances':{'*':{texture:b.id,render_method:'opaque'}}}}}; }
+function biomeJson(b){ return {format_version:'1.21.70','minecraft:biome':{description:{identifier:`${ns()}:${b.id}`},components:{'minecraft:temperature':{value:b.temp},'minecraft:downfall':{value:b.downfall},'minecraft:humidity':{is_humid:b.downfall>0.5},'minecraft:tags':{tags:b.tags},'minecraft:overworld_generation_rules':{generate_for_climates:[[b.temp,b.downfall]]}}}}; }
+function clientBiomeJson(b){ return {format_version:'1.21.70','minecraft:client_biome':{description:{identifier:`${ns()}:${b.id}`},components:{'minecraft:sky_color':hexToInt(b.sky),'minecraft:water_appearance':{surface_color:'#44aff5'},'minecraft:grass_appearance':{color:b.grass}}}}; }
+function hexToInt(h){ return parseInt(String(h).replace('#',''),16); }
+function recipeJson(r){ if(r.type==='shapeless') return {format_version:'1.20.10','minecraft:recipe_shapeless':{description:{identifier:`${ns()}:${r.id}`},tags:['crafting_table'],ingredients:r.ingredients.map(i=>({item:i})),result:{item:r.result,count:r.count}}};
+  const keys={}, letters='ABCDEFGHI'; let pattern=[]; for(let row=0;row<3;row++){ let line=''; for(let col=0;col<3;col++){ const val=r.cells[row*3+col]; if(val){ const letter=letters[row*3+col]; keys[letter]={item:val}; line+=letter; } else line+=' '; } pattern.push(line.replace(/ +$/,'')); } return {format_version:'1.20.10','minecraft:recipe_shaped':{description:{identifier:`${ns()}:${r.id}`},tags:['crafting_table'],pattern,key:keys,result:{item:r.result,count:r.count}}}; }
+function scriptText(){ const actionItems=state.items.filter(i=>i.useOn && (i.useFunction || i.useCommand)); let body=`import { world } from "@minecraft/server";\n\nconst ACTIONS = ${JSON.stringify(actionItems.map(i=>({id:`${ns()}:${i.id}`,func:i.useFunction||'',commands:(i.useCommand||'').split('\n').map(x=>x.trim()).filter(Boolean)})),null,2)};\n\nworld.afterEvents.itemUse.subscribe((event) => {\n  const source = event.source;\n  const item = event.itemStack;\n  if (!source || !item) return;\n  const found = ACTIONS.find(a => a.id === item.typeId);\n  if (!found) return;\n  try {\n    if (found.func) source.runCommand(\`function \${found.func}\`);\n    for (const command of found.commands) source.runCommand(command);\n  } catch (err) {\n    console.warn(\`Bed-Mod Maker action failed: \${err}\`);\n  }\n});\n`; return body; }
+function manifest(name,type,withScript=false){ const modules=[{type,uuid:uuid(),version:[1,0,0]}]; if(withScript) modules.push({type:'script',language:'javascript',uuid:uuid(),version:[1,0,0],entry:'scripts/main.js'}); const m={format_version:2,header:{name,description:$('description').value,uuid:uuid(),version:[1,0,0],min_engine_version:[1,21,70]},modules}; if(withScript) m.dependencies=[{module_name:'@minecraft/server',version:'1.18.0'}]; return m; }
+function textureList(){ const data={resource_pack_name:project(),texture_name:'atlas.items',texture_data:{}}; for(const it of state.items) data.texture_data[it.id]={textures:`textures/items/${it.id}`}; return data; }
+function terrainTexture(){ const data={resource_pack_name:project(),texture_name:'terrain_texture',texture_data:{}}; for(const b of state.blocks) data.texture_data[b.id]={textures:`textures/blocks/${b.id}`}; return data; }
+function langText(){ let lines=[]; state.items.forEach(i=>lines.push(`item.${ns()}:${i.id}.name=${i.name}`)); state.blocks.forEach(b=>lines.push(`tile.${ns()}:${b.id}.name=${b.name}`)); state.biomes.forEach(b=>lines.push(`biome.${ns()}:${b.id}.name=${b.name}`)); return lines.join('\n')+'\n'; }
+function worldSetupFunction(w){ const cmds=[`gamemode ${w.gamemode} @a`,`difficulty ${w.difficulty}`]; String(w.items||'').split(',').map(x=>x.trim()).filter(Boolean).forEach(x=>cmds.push(`give @p ${x}`)); return cmds.join('\n'); }
+function installNotes(){ return `BED-MOD MAKER V2 EXPORT\n\nThis zip contains a Behavior Pack and Resource Pack pair.\n\nInstall idea:\n1. Extract this zip.\n2. Put the BP folder into your com.mojang behavior_packs folder.\n3. Put the RP folder into your com.mojang resource_packs folder.\n4. Enable both packs on a world.\n\nNotes:\n- Custom item use actions are generated with a scripts/main.js file. If your Minecraft version asks for script/experiment toggles, enable the needed creator/script toggles.\n- Structure spawning only works for .mcstructure files you uploaded into the maker.\n- World Presets are guides/functions, not edited world saves. This V2 intentionally does not edit world files.\n`; }
+function filesPreview(){ const bp=`${project()}_BP`, rp=`${project()}_RP`; let f=[`${bp}/manifest.json`,`${rp}/manifest.json`,`${rp}/texts/en_US.lang`]; state.items.forEach(i=>{f.push(`${bp}/items/${i.id}.json`,`${rp}/textures/items/${i.id}.png`)}); state.blocks.forEach(b=>{f.push(`${bp}/blocks/${b.id}.json`,`${rp}/textures/blocks/${b.id}.png`)}); state.recipes.forEach(r=>f.push(`${bp}/recipes/${r.id}.json`)); Object.keys(state.functions).forEach(n=>f.push(`${bp}/functions/${n}.mcfunction`)); state.structures.forEach(s=>f.push(`${bp}/structures/${s.id}.mcstructure`)); state.biomes.forEach(b=>{f.push(`${bp}/biomes/${b.id}.json`,`${rp}/biomes_client/${b.id}.json`)}); state.worlds.forEach(w=>{f.push(`WORLD_PRESETS/${cleanId(w.name)}.json`,`${bp}/functions/world_${cleanId(w.name)}.mcfunction`)}); return f.sort().join('\n'); }
+function renderExportPreview(full=true){ if(!full && !$('export').classList.contains('active')) return; $('stats').innerHTML=[['Items',state.items.length],['Functions',Object.keys(state.functions).length],['Recipes',state.recipes.length],['Structures',state.structures.length],['Blocks',state.blocks.length],['Biomes',state.biomes.length],['World Presets',state.worlds.length]].map(s=>`<div class="stat"><strong>${s[1]}</strong>${s[0]}</div>`).join(''); $('filePreview').textContent=filesPreview(); }
+async function dataUrlToBlob(url){ return await (await fetch(url)).blob(); }
+async function exportZip(){
+  const zip=new JSZip(); const bpName=`${project()}_BP`, rpName=`${project()}_RP`; const bp=zip.folder(bpName), rp=zip.folder(rpName);
+  const needsScript=state.items.some(i=>i.useOn && (i.useFunction||i.useCommand));
+  bp.file('manifest.json', pretty(manifest(`${$('projectName').value} BP`,'data',needsScript))); rp.file('manifest.json', pretty(manifest(`${$('projectName').value} RP`,'resources',false)));
+  if(needsScript) bp.file('scripts/main.js', scriptText());
+  bp.file('README_BED_MOD_MAKER.txt', installNotes()); zip.file('HOW_TO_INSTALL.txt', installNotes());
+  for(const [n,lines] of Object.entries(state.functions)) bp.file(`functions/${n}.mcfunction`, lines.join('\n'));
+  for(const it of state.items){ bp.file(`items/${it.id}.json`, pretty(itemJson(it))); const blob=await dataUrlToBlob(it.texture||autoTexture(it.color||'#4cc9f0')); rp.file(`textures/items/${it.id}.png`, blob); }
+  if(state.items.length) rp.file('textures/item_texture.json', pretty(textureList()));
+  for(const r of state.recipes) bp.file(`recipes/${r.id}.json`, pretty(recipeJson(r)));
+  for(const s of state.structures) bp.file(`structures/${s.id}.mcstructure`, s.data);
+  for(const b of state.blocks){ bp.file(`blocks/${b.id}.json`, pretty(blockJson(b))); const blob=await dataUrlToBlob(autoTexture(b.color)); rp.file(`textures/blocks/${b.id}.png`, blob); }
+  if(state.blocks.length) rp.file('textures/terrain_texture.json', pretty(terrainTexture()));
+  for(const b of state.biomes){ bp.file(`biomes/${b.id}.json`, pretty(biomeJson(b))); rp.file(`biomes_client/${b.id}.json`, pretty(clientBiomeJson(b))); }
+  for(const w of state.worlds){ zip.file(`WORLD_PRESETS/${cleanId(w.name)}.json`, pretty(w)); bp.file(`functions/world_${cleanId(w.name)}.mcfunction`, worldSetupFunction(w)); }
+  rp.file('texts/en_US.lang', langText());
+  const content=await zip.generateAsync({type:'blob'}); const a=document.createElement('a'); a.href=URL.createObjectURL(content); a.download=`${project()}_bed_mod_maker_export.zip`; a.click(); URL.revokeObjectURL(a.href); toast('Exported zip');
 }
+$('exportZipBtn').onclick=exportZip;
 
-function namespace() {
-  return slugify($("namespace").value, "derp").replace(/-/g, "_");
-}
+$('quickDemoBtn').onclick=()=>{ createFunction(); state.functions.magic_spawn=['say Magic spawn activated!','effect @s speed 10 1']; state.selectedFunction='magic_spawn'; $('itemId').value='magic_wand';$('itemName').value='Magic Wand';$('itemUseFunction').value='magic_spawn';$('itemUseCommand').value='playsound random.levelup @s';$('addItemBtn').click(); state.recipes.push({type:'shapeless',id:'magic_wand_recipe',result:`${ns()}:magic_wand`,count:1,ingredients:['minecraft:stick','minecraft:diamond']}); renderFunctions(); renderRecipes(); toast('Demo added'); };
+$('clearProjectBtn').onclick=()=>{ if(confirm('Clear items, functions, recipes, blocks, biomes, structures, and world presets?')){ Object.assign(state,{selectedFunction:null,functions:{},items:[],recipes:[],structures:[],blocks:[],biomes:[],worlds:[]}); renderAll(); } };
+function renderAll(){ renderFunctions(); renderItems(); renderRecipes(); renderStructures(); renderBlocks(); renderBiomes(); renderWorlds(); renderExportPreview(); }
 
-function projectName() {
-  return $("projectName").value.trim() || "Derp Addon";
-}
-
-function versionArray(text) {
-  const parts = String(text || "1.20.30").split(".").map(n => Math.max(0, parseInt(n, 10) || 0));
-  while (parts.length < 3) parts.push(0);
-  return parts.slice(0, 3);
-}
-
-function uuidv4() {
-  if (crypto && crypto.randomUUID) return crypto.randomUUID();
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    const v = c === "x" ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-function fullId(id) {
-  const clean = slugify(id, "thing");
-  return clean.includes(":") ? clean : `${namespace()}:${clean}`;
-}
-
-function downloadBlob(blob, fileName) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-
-function prettyJson(obj) {
-  return JSON.stringify(obj, null, 2);
-}
-
-function setTabs() {
-  document.querySelectorAll(".tab").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
-      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
-      btn.classList.add("active");
-      $("tab-" + btn.dataset.tab).classList.add("active");
-      if (btn.dataset.tab === "export") renderFileTree();
-    });
-  });
-}
-
-function addItem() {
-  const id = slugify($("itemId").value, "custom_item");
-  const existing = state.items.find(item => item.id === id);
-  if (existing && !confirm("An item with that ID already exists. Replace it?")) return;
-
-  const item = {
-    id,
-    displayName: $("itemName").value.trim() || id,
-    maxStack: Math.min(64, Math.max(1, parseInt($("itemStack").value, 10) || 64)),
-    category: $("itemCategory").value,
-    color: $("itemColor").value,
-    textureStyle: $("itemTextureStyle").value
-  };
-
-  state.items = state.items.filter(old => old.id !== id);
-  state.items.push(item);
-  $("recipeResult").value = `${namespace()}:${id}`;
-  renderAll();
-}
-
-function removeItem(id) {
-  state.items = state.items.filter(item => item.id !== id);
-  renderAll();
-}
-
-function renderItems() {
-  const box = $("itemsList");
-  box.innerHTML = state.items.length ? "" : `<p class="muted">No items yet. Add one and it will appear here.</p>`;
-  for (const item of state.items) {
-    const div = document.createElement("div");
-    div.className = "item-card";
-    div.innerHTML = `
-      <div>
-        <b>${item.displayName}</b>
-        <div class="meta"><code>${namespace()}:${item.id}</code> · stack ${item.maxStack} · ${item.textureStyle}</div>
-      </div>
-      <button onclick="removeItem('${item.id}')">Remove</button>
-    `;
-    box.appendChild(div);
-  }
-}
-
-function syncRecipeMode() {
-  const shaped = $("recipeType").value === "shaped";
-  $("shapelessBox").classList.toggle("hidden", shaped);
-  $("shapedBox").classList.toggle("hidden", !shaped);
-}
-
-function addRecipe() {
-  const id = slugify($("recipeId").value, "custom_recipe");
-  const result = $("recipeResult").value.trim() || `${namespace()}:black_pixel`;
-  const count = Math.min(64, Math.max(1, parseInt($("recipeCount").value, 10) || 1));
-  const type = $("recipeType").value;
-
-  let recipe;
-  if (type === "shapeless") {
-    const ingredients = $("recipeIngredients").value
-      .split(/\n|,/)
-      .map(x => x.trim())
-      .filter(Boolean)
-      .map(item => ({ item }));
-    if (!ingredients.length) return alert("Add at least one ingredient.");
-    recipe = { id, type, result, count, ingredients };
-  } else {
-    const rows = [0, 1, 2].map(r => [0, 1, 2].map(c => $(`p${r}${c}`).value.trim().slice(0, 1) || " ").join(""));
-    const key = {};
-    $("recipeKeyMap").value.split("\n").forEach(line => {
-      const [letter, item] = line.split("=").map(x => (x || "").trim());
-      if (letter && item) key[letter.slice(0, 1)] = { item };
-    });
-    recipe = { id, type, result, count, pattern: rows, key };
-  }
-
-  state.recipes = state.recipes.filter(old => old.id !== id);
-  state.recipes.push(recipe);
-  renderAll();
-}
-
-function removeRecipe(id) {
-  state.recipes = state.recipes.filter(recipe => recipe.id !== id);
-  renderAll();
-}
-
-function renderRecipes() {
-  const box = $("recipesList");
-  box.innerHTML = state.recipes.length ? "" : `<p class="muted">No recipes yet.</p>`;
-  for (const recipe of state.recipes) {
-    const div = document.createElement("div");
-    div.className = "item-card";
-    div.innerHTML = `
-      <div>
-        <b>${recipe.id}</b>
-        <div class="meta">${recipe.type} → <code>${recipe.result}</code> x${recipe.count}</div>
-      </div>
-      <button onclick="removeRecipe('${recipe.id}')">Remove</button>
-    `;
-    box.appendChild(div);
-  }
-}
-
-function addStructureFiles(files) {
-  [...files].forEach(file => {
-    if (!file.name.toLowerCase().endsWith(".mcstructure")) return;
-    const cleanName = slugify(file.name.replace(/\.mcstructure$/i, ""), "structure") + ".mcstructure";
-    state.structures = state.structures.filter(old => old.name !== cleanName);
-    state.structures.push({ name: cleanName, file });
-  });
-  renderAll();
-}
-
-function addStructureFunction() {
-  const functionName = slugify($("structureFunctionName").value, "spawn_structure");
-  let struct = $("structureName").value.trim() || "structure";
-  struct = struct.includes(":") ? struct : `${namespace()}:${slugify(struct, "structure")}`;
-  const x = parseInt($("structureX").value, 10) || 0;
-  const y = parseInt($("structureY").value, 10) || 0;
-  const z = parseInt($("structureZ").value, 10) || 0;
-  const target = $("structureTarget").value;
-  const pos = `~${x || ""} ~${y || ""} ~${z || ""}`;
-  const command = `execute as ${target} at @s run structure load ${struct} ${pos}`;
-
-  state.functions = state.functions.filter(fn => fn.name !== functionName);
-  state.functions.push({ name: functionName, commands: [command] });
-  renderAll();
-  alert(`Added /function ${functionName}`);
-}
-
-function removeStructure(name) {
-  state.structures = state.structures.filter(struct => struct.name !== name);
-  renderAll();
-}
-
-function renderStructures() {
-  const box = $("structuresList");
-  box.innerHTML = state.structures.length ? "" : `<p class="muted">No .mcstructure files uploaded yet. You can still make a function now and add the file later.</p>`;
-  for (const struct of state.structures) {
-    const idNoExt = struct.name.replace(/\.mcstructure$/i, "");
-    const div = document.createElement("div");
-    div.className = "item-card";
-    div.innerHTML = `
-      <div>
-        <b>${struct.name}</b>
-        <div class="meta">Structure ID: <code>${namespace()}:${idNoExt}</code></div>
-      </div>
-      <button onclick="removeStructure('${struct.name}')">Remove</button>
-    `;
-    box.appendChild(div);
-  }
-}
-
-function applyFunctionTemplate() {
-  const template = $("functionTemplate").value;
-  if (template === "give") {
-    const first = state.items[0] ? `${namespace()}:${state.items[0].id}` : `${namespace()}:black_pixel`;
-    $("functionCommands").value = `give @p ${first} 1\nsay Gave a custom item!`;
-  }
-  if (template === "lightning") {
-    $("functionCommands").value = `execute as @a at @s run summon lightning_bolt ~3 ~ ~\nexecute as @a at @s run summon lightning_bolt ~-3 ~ ~\nexecute as @a at @s run summon lightning_bolt ~ ~ ~3`;
-  }
-  if (template === "night") {
-    $("functionCommands").value = `time set night\nsay The night has arrived.`;
-  }
-}
-
-function addFunction() {
-  const name = slugify($("functionName").value, "custom_function");
-  const commands = $("functionCommands").value.split("\n").map(x => x.trim().replace(/^\//, "")).filter(Boolean);
-  if (!commands.length) return alert("Add at least one command.");
-  state.functions = state.functions.filter(fn => fn.name !== name);
-  state.functions.push({ name, commands });
-  renderAll();
-}
-
-function removeFunction(name) {
-  state.functions = state.functions.filter(fn => fn.name !== name);
-  renderAll();
-}
-
-function renderFunctions() {
-  const box = $("functionsList");
-  box.innerHTML = state.functions.length ? "" : `<p class="muted">No functions yet.</p>`;
-  for (const fn of state.functions) {
-    const div = document.createElement("div");
-    div.className = "item-card";
-    div.innerHTML = `
-      <div>
-        <b>/function ${fn.name}</b>
-        <div class="meta">${fn.commands.length} command(s)</div>
-      </div>
-      <button onclick="removeFunction('${fn.name}')">Remove</button>
-    `;
-    box.appendChild(div);
-  }
-}
-
-function itemJson(item) {
-  return {
-    format_version: "1.20.30",
-    "minecraft:item": {
-      description: {
-        identifier: `${namespace()}:${item.id}`,
-        category: item.category
-      },
-      components: {
-        "minecraft:max_stack_size": item.maxStack,
-        "minecraft:icon": { texture: `${namespace()}_${item.id}` },
-        "minecraft:display_name": { value: item.displayName }
-      }
-    }
-  };
-}
-
-function recipeJson(recipe) {
-  if (recipe.type === "shapeless") {
-    return {
-      format_version: "1.20.10",
-      "minecraft:recipe_shapeless": {
-        description: { identifier: `${namespace()}:${recipe.id}` },
-        tags: ["crafting_table"],
-        ingredients: recipe.ingredients,
-        result: { item: recipe.result, count: recipe.count }
-      }
-    };
-  }
-
-  return {
-    format_version: "1.20.10",
-    "minecraft:recipe_shaped": {
-      description: { identifier: `${namespace()}:${recipe.id}` },
-      tags: ["crafting_table"],
-      pattern: recipe.pattern,
-      key: recipe.key,
-      result: { item: recipe.result, count: recipe.count }
-    }
-  };
-}
-
-function makeManifest(type, headerUuid, moduleUuid, dependencyUuid) {
-  const isRp = type === "resources";
-  const manifest = {
-    format_version: 2,
-    header: {
-      name: `${projectName()} ${isRp ? "RP" : "BP"}`,
-      description: $("description").value.trim() || "Made with Bed-Mod Maker",
-      uuid: headerUuid,
-      version: [1, 0, 0],
-      min_engine_version: versionArray($("minEngine").value)
-    },
-    modules: [{
-      type,
-      uuid: moduleUuid,
-      version: [1, 0, 0]
-    }],
-    metadata: {
-      authors: [$("author").value.trim() || "Bed-Mod Maker"]
-    }
-  };
-
-  if (!isRp && dependencyUuid) {
-    manifest.dependencies = [{ uuid: dependencyUuid, version: [1, 0, 0] }];
-  }
-  return manifest;
-}
-
-function textureJson() {
-  const data = {};
-  for (const item of state.items) {
-    data[`${namespace()}_${item.id}`] = { textures: `textures/items/${item.id}` };
-  }
-  return {
-    resource_pack_name: `${namespace()}_resources`,
-    texture_name: "atlas.items",
-    texture_data: data
-  };
-}
-
-function langFile() {
-  const lines = [];
-  for (const item of state.items) {
-    lines.push(`item.${namespace()}:${item.id}=${item.displayName}`);
-  }
-  return lines.join("\n") + "\n";
-}
-
-function hexToRgb(hex) {
-  const clean = hex.replace("#", "");
-  const n = parseInt(clean, 16);
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-}
-
-function pngBlobForItem(item) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 16;
-  canvas.height = 16;
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, 16, 16);
-  const { r, g, b } = hexToRgb(item.color);
-
-  function fill(x, y, w, h, alpha = 1) {
-    ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
-    ctx.fillRect(x, y, w, h);
-  }
-
-  if (item.textureStyle === "pixel") {
-    fill(7, 7, 2, 2, 1);
-    fill(6, 6, 4, 4, .28);
-  } else if (item.textureStyle === "gem") {
-    fill(7, 2, 2, 1, .65);
-    fill(5, 3, 6, 2, .85);
-    fill(3, 5, 10, 4, 1);
-    fill(5, 9, 6, 3, .85);
-    fill(7, 12, 2, 2, .55);
-    ctx.fillStyle = "rgba(255,255,255,.45)";
-    ctx.fillRect(5, 5, 2, 2);
-  } else {
-    fill(6, 2, 4, 1, .42);
-    fill(4, 3, 8, 2, .65);
-    fill(3, 5, 10, 6, 1);
-    fill(4, 11, 8, 2, .65);
-    fill(6, 13, 4, 1, .42);
-    ctx.fillStyle = "rgba(255,255,255,.42)";
-    ctx.fillRect(5, 5, 3, 2);
-  }
-
-  return new Promise(resolve => canvas.toBlob(resolve, "image/png"));
-}
-
-function buildFileList() {
-  const base = safeFileName(projectName().replace(/\s+/g, "_"), "BedModProject");
-  const bp = `${base}_BP`;
-  const rp = `${base}_RP`;
-  const files = [];
-  files.push(`${bp}/manifest.json`);
-  files.push(`${bp}/README.txt`);
-  files.push(`${rp}/manifest.json`);
-  files.push(`${rp}/README.txt`);
-  if (state.items.length) {
-    for (const item of state.items) {
-      files.push(`${bp}/items/${item.id}.json`);
-      files.push(`${rp}/textures/items/${item.id}.png`);
-    }
-    files.push(`${rp}/textures/item_texture.json`);
-    files.push(`${rp}/texts/en_US.lang`);
-  }
-  for (const recipe of state.recipes) files.push(`${bp}/recipes/${recipe.id}.json`);
-  for (const struct of state.structures) files.push(`${bp}/structures/${struct.name}`);
-  for (const fn of state.functions) files.push(`${bp}/functions/${fn.name}.mcfunction`);
-  return files;
-}
-
-function renderFileTree() {
-  const files = buildFileList();
-  $("fileTree").textContent = files.join("\n");
-}
-
-function renderStats() {
-  $("statItems").textContent = state.items.length;
-  $("statRecipes").textContent = state.recipes.length;
-  $("statStructures").textContent = state.structures.length;
-  $("statFunctions").textContent = state.functions.length;
-}
-
-function renderAll() {
-  renderItems();
-  renderRecipes();
-  renderStructures();
-  renderFunctions();
-  renderStats();
-  renderFileTree();
-}
-
-async function exportAddon() {
-  if (!window.JSZip) return alert("JSZip did not load. Check your internet connection, then refresh.");
-
-  const zip = new JSZip();
-  const base = safeFileName(projectName().replace(/\s+/g, "_"), "BedModProject");
-  const bpName = `${base}_BP`;
-  const rpName = `${base}_RP`;
-  const bp = zip.folder(bpName);
-  const rp = zip.folder(rpName);
-
-  const rpHeaderUuid = uuidv4();
-  const bpHeaderUuid = uuidv4();
-  bp.file("manifest.json", prettyJson(makeManifest("data", bpHeaderUuid, uuidv4(), rpHeaderUuid)));
-  rp.file("manifest.json", prettyJson(makeManifest("resources", rpHeaderUuid, uuidv4())));
-
-  bp.file("README.txt", `Generated with Bed-Mod Maker.\n\nInstall both the BP and RP into Minecraft Bedrock.\nRun functions with /function function_name.\nStructures go in BP/structures and can be loaded with /structure load ${namespace()}:name ~ ~ ~\n`);
-  rp.file("README.txt", `Resource pack generated with Bed-Mod Maker.\nTextures are in textures/items.\n`);
-
-  if (state.items.length) {
-    for (const item of state.items) {
-      bp.file(`items/${item.id}.json`, prettyJson(itemJson(item)));
-      const blob = await pngBlobForItem(item);
-      rp.file(`textures/items/${item.id}.png`, blob);
-    }
-    rp.file("textures/item_texture.json", prettyJson(textureJson()));
-    rp.file("texts/en_US.lang", langFile());
-  }
-
-  for (const recipe of state.recipes) {
-    bp.file(`recipes/${recipe.id}.json`, prettyJson(recipeJson(recipe)));
-  }
-
-  for (const struct of state.structures) {
-    bp.file(`structures/${struct.name}`, struct.file);
-  }
-
-  for (const fn of state.functions) {
-    bp.file(`functions/${fn.name}.mcfunction`, fn.commands.map(c => c.replace(/^\//, "")).join("\n") + "\n");
-  }
-
-  const howTo = [
-    "BED-MOD MAKER EXPORT",
-    "====================",
-    "",
-    "What is inside:",
-    `- ${bpName}: Behavior Pack`,
-    `- ${rpName}: Resource Pack`,
-    "",
-    "How to use:",
-    "1. Extract this zip.",
-    "2. Put the BP folder into com.mojang/behavior_packs.",
-    "3. Put the RP folder into com.mojang/resource_packs.",
-    "4. Add both packs to a world.",
-    "5. Use /function name_here for generated functions.",
-    "",
-    "Structure spawning:",
-    "- .mcstructure files are placed in BP/structures.",
-    `- Load them with /structure load ${namespace()}:file_name ~ ~ ~`,
-    "- The maker can generate .mcfunction files that run that command for you.",
-    ""
-  ].join("\n");
-  zip.file("HOW_TO_INSTALL.txt", howTo);
-
-  const blob = await zip.generateAsync({ type: "blob" });
-  let fileName = safeFileName($("zipName").value || `${base}.zip`, `${base}.zip`);
-  if (!fileName.toLowerCase().endsWith(".zip")) fileName += ".zip";
-  downloadBlob(blob, fileName);
-}
-
-function resetProject() {
-  if (!confirm("Clear items, recipes, structures, and functions?")) return;
-  state.items = [];
-  state.recipes = [];
-  state.structures = [];
-  state.functions = [];
-  renderAll();
-}
-
-function downloadSampleStructureNote() {
-  const text = `Structure spawning notes\n\nBed-Mod Maker cannot draw a .mcstructure from nothing yet. Make one in Minecraft using a Structure Block, export it as a .mcstructure file, then upload it in the Structures tab.\n\nAfter export, the file goes in BP/structures. You can load it with commands such as:\nstructure load ${namespace()}:your_structure_name ~ ~ ~\n\nOr use the Structures tab to generate a function, then run:\n/function spawn_structure\n`;
-  downloadBlob(new Blob([text], { type: "text/plain" }), "structure-help.txt");
-}
-
-function setupStructureDrop() {
-  const zone = $("structureDrop");
-  const input = $("structureInput");
-  zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("dragover"); });
-  zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
-  zone.addEventListener("drop", e => {
-    e.preventDefault();
-    zone.classList.remove("dragover");
-    addStructureFiles(e.dataTransfer.files);
-  });
-  input.addEventListener("change", () => addStructureFiles(input.files));
-}
-
-function setupStars() {
-  const canvas = $("stars");
-  const ctx = canvas.getContext("2d");
-  function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
-  resize();
-  addEventListener("resize", resize);
-  const stars = Array.from({ length: 150 }, () => ({
-    x: Math.random() * innerWidth,
-    y: Math.random() * innerHeight,
-    r: Math.random() * 1.7 + 0.25,
-    s: Math.random() * 0.28 + 0.04,
-    a: Math.random() * .7 + .25
-  }));
-  function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (const star of stars) {
-      ctx.fillStyle = `rgba(196,181,253,${star.a})`;
-      ctx.beginPath();
-      ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-      ctx.fill();
-      star.y += star.s;
-      if (star.y > canvas.height + 4) { star.y = -4; star.x = Math.random() * canvas.width; }
-    }
-    requestAnimationFrame(draw);
-  }
-  draw();
-}
-
-setTabs();
-setupStructureDrop();
-setupStars();
-syncRecipeMode();
-renderAll();
+initCommands(); initCraft(); drawPixels(); renderAll();

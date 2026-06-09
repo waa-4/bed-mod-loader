@@ -3,184 +3,246 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bed-Mod Maker</title>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <title>Bed-Mod Maker V2</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
-  <canvas id="stars"></canvas>
-  <div class="bottom-glow"></div>
-
-  <header class="hero">
-    <div class="pill">/bed-mod-loader/maker</div>
-    <h1>Bed-Mod Maker</h1>
-    <p>Create simple Minecraft Bedrock add-on zips right in your browser.</p>
-    <div class="hero-actions">
-      <button onclick="exportAddon()">Export Add-on Zip</button>
-      <button class="ghost" onclick="downloadSampleStructureNote()">Structure Help</button>
+  <div class="stars"></div>
+  <header class="topbar">
+    <a class="back" href="../">← Loader</a>
+    <div>
+      <h1>Bed-Mod Maker <span>V2</span></h1>
+      <p>Build Minecraft Bedrock add-ons in your browser, then export as a zip.</p>
     </div>
+    <button id="exportZipBtn" class="primary">Export Add-on ZIP</button>
   </header>
 
-  <main class="app-shell">
-    <aside class="sidebar card">
+  <main class="app">
+    <aside class="sidebar">
       <button class="tab active" data-tab="project">Project</button>
+      <button class="tab" data-tab="commands">Commands</button>
+      <button class="tab" data-tab="functions">Functions</button>
       <button class="tab" data-tab="items">Items</button>
+      <button class="tab" data-tab="weapons">Weapons</button>
+      <button class="tab" data-tab="textures">Pixel Texture</button>
       <button class="tab" data-tab="recipes">Recipes</button>
       <button class="tab" data-tab="structures">Structures</button>
-      <button class="tab" data-tab="functions">Functions</button>
-      <button class="tab" data-tab="export">Export</button>
-      <hr />
-      <button class="danger-lite" onclick="resetProject()">Reset Maker</button>
+      <button class="tab" data-tab="blocks">Blocks</button>
+      <button class="tab" data-tab="biomes">Biomes</button>
+      <button class="tab" data-tab="worlds">World Presets</button>
+      <button class="tab" data-tab="export">Export Preview</button>
     </aside>
 
     <section class="workspace">
-      <section class="panel card active" id="tab-project">
+      <section class="panel active" id="project">
         <h2>Project Setup</h2>
-        <p class="muted">This creates a paired Behavior Pack + Resource Pack and downloads them inside one zip.</p>
+        <p class="hint">This creates a Behavior Pack + Resource Pack pair. Everything exports as a zip so you can convert/import later.</p>
         <div class="grid two">
-          <label>Project Name<input id="projectName" value="Derp Addon" /></label>
-          <label>Namespace<input id="namespace" value="derp" /></label>
-          <label>Author<input id="author" value="waa-4" /></label>
-          <label>Description<input id="description" value="Made with Bed-Mod Maker" /></label>
-          <label>Minimum Engine Version<input id="minEngine" value="1.20.30" /></label>
-          <label>Zip File Name<input id="zipName" value="DerpAddon.zip" /></label>
+          <label>Project Name <input id="projectName" value="Derp Addon" /></label>
+          <label>Namespace <input id="namespace" value="derp" /></label>
+          <label>Author <input id="author" value="waa-4" /></label>
+          <label>Description <input id="description" value="Made with Bed-Mod Maker V2" /></label>
         </div>
-        <div class="notice">
-          <b>Tip:</b> Namespace should be simple lowercase text like <code>derp</code>, <code>sibo</code>, or <code>hellmode</code>. Identifiers become things like <code>derp:black_pixel</code>.
+        <div class="cardRow">
+          <button id="quickDemoBtn">Add Demo Stuff</button>
+          <button id="clearProjectBtn" class="danger">Clear Created Things</button>
         </div>
+        <div class="note"><b>Tip:</b> use lowercase ids like <code>magic_wand</code>. The maker cleans names, but clean ids prevent Minecraft from becoming angry spaghetti.</div>
       </section>
 
-      <section class="panel card" id="tab-items">
-        <h2>Item Creator</h2>
-        <p class="muted">Creates BP item JSON + RP item texture data. Great for simple tools, collectibles, and crafting ingredients.</p>
+      <section class="panel" id="commands">
+        <h2>Commands Builder</h2>
+        <p class="hint">Pick a command type, fill boxes, copy it, or add it to a function/item action.</p>
         <div class="grid three">
-          <label>Item ID<input id="itemId" value="black_pixel" /></label>
-          <label>Display Name<input id="itemName" value="Black Pixel" /></label>
-          <label>Max Stack<input id="itemStack" type="number" min="1" max="64" value="64" /></label>
-          <label>Category
-            <select id="itemCategory">
-              <option>Items</option>
-              <option>Equipment</option>
-              <option>Nature</option>
-              <option>Construction</option>
-            </select>
+          <label>Command Type
+            <select id="cmdType"></select>
           </label>
-          <label>Texture Color<input id="itemColor" type="color" value="#111111" /></label>
-          <label>Texture Style
-            <select id="itemTextureStyle">
-              <option value="pixel">Single pixel icon</option>
-              <option value="gem">Tiny gem icon</option>
-              <option value="orb">Orb icon</option>
-            </select>
-          </label>
+          <label>Target / Selector <input id="cmdTarget" value="@p" /></label>
+          <label>Amount / Level <input id="cmdAmount" value="1" /></label>
         </div>
-        <button onclick="addItem()">Add Item</button>
-        <div class="list" id="itemsList"></div>
+        <div id="cmdFields" class="grid three"></div>
+        <label>Generated Command<textarea id="cmdOutput" rows="3" readonly></textarea></label>
+        <div class="cardRow">
+          <button id="copyCmdBtn">Copy Command</button>
+          <button id="addCmdToFunctionBtn">Add To Selected Function</button>
+          <button id="addCmdToItemBtn">Add To Selected Item Use</button>
+        </div>
       </section>
 
-      <section class="panel card" id="tab-recipes">
-        <h2>Recipe Creator</h2>
-        <p class="muted">Creates shapeless or shaped crafting recipes. Use vanilla IDs like <code>minecraft:stick</code> or your custom IDs like <code>derp:black_pixel</code>.</p>
+      <section class="panel" id="functions">
+        <h2>Function Builder</h2>
         <div class="grid two">
-          <label>Recipe ID<input id="recipeId" value="black_pixel_from_stick" /></label>
-          <label>Result Item<input id="recipeResult" value="derp:black_pixel" /></label>
-          <label>Result Count<input id="recipeCount" type="number" min="1" max="64" value="1" /></label>
-          <label>Recipe Type
-            <select id="recipeType" onchange="syncRecipeMode()">
-              <option value="shapeless">Shapeless</option>
-              <option value="shaped">Shaped 3x3</option>
-            </select>
-          </label>
+          <label>Function Name <input id="functionName" value="starter_function" /></label>
+          <label>Add Command <input id="manualCommand" placeholder="say hello from a function" /></label>
         </div>
-
-        <div id="shapelessBox">
-          <label>Ingredients, one per line<textarea id="recipeIngredients">minecraft:stick</textarea></label>
+        <div class="cardRow">
+          <button id="createFunctionBtn">Create / Select Function</button>
+          <button id="addManualCommandBtn">Add Manual Command</button>
+          <button id="deleteFunctionBtn" class="danger">Delete Selected Function</button>
         </div>
-
-        <div id="shapedBox" class="hidden">
-          <p class="small-title">Pattern</p>
-          <div class="recipe-grid">
-            <input maxlength="1" id="p00"><input maxlength="1" id="p01"><input maxlength="1" id="p02">
-            <input maxlength="1" id="p10"><input maxlength="1" id="p11"><input maxlength="1" id="p12">
-            <input maxlength="1" id="p20"><input maxlength="1" id="p21"><input maxlength="1" id="p22">
+        <div class="grid two wideLeft">
+          <div>
+            <h3>Functions</h3>
+            <div id="functionList" class="list"></div>
           </div>
-          <label>Key Map, one per line like <code>A=minecraft:stick</code><textarea id="recipeKeyMap">A=minecraft:stick</textarea></label>
+          <div>
+            <h3>Selected Function Contents</h3>
+            <textarea id="functionText" rows="14"></textarea>
+            <button id="saveFunctionTextBtn">Save Function Text</button>
+          </div>
         </div>
-
-        <button onclick="addRecipe()">Add Recipe</button>
-        <div class="list" id="recipesList"></div>
       </section>
 
-      <section class="panel card" id="tab-structures">
-        <h2>Structure Spawning</h2>
-        <p class="muted">Upload existing <code>.mcstructure</code> files or create function placeholders that load structures by command.</p>
-        <div class="drop-zone" id="structureDrop">
-          <h3>Drop .mcstructure files here</h3>
-          <p>They will be placed in <code>BP/structures/</code> inside the exported zip.</p>
-          <input id="structureInput" type="file" accept=".mcstructure" multiple hidden />
-          <button onclick="structureInput.click()">Choose Structures</button>
-        </div>
-
-        <div class="grid two top-gap">
-          <label>Function Name<input id="structureFunctionName" value="spawn_structure" /></label>
-          <label>Structure ID / File Name<input id="structureName" value="derp_house" /></label>
-          <label>X Offset<input id="structureX" type="number" value="0" /></label>
-          <label>Y Offset<input id="structureY" type="number" value="0" /></label>
-          <label>Z Offset<input id="structureZ" type="number" value="0" /></label>
-          <label>Run At
-            <select id="structureTarget">
-              <option value="@p">nearest player</option>
-              <option value="@a">all players</option>
-              <option value="@s">command runner</option>
-            </select>
+      <section class="panel" id="items">
+        <h2>Item Creator</h2>
+        <div class="grid three">
+          <label>Item ID <input id="itemId" value="magic_wand" /></label>
+          <label>Display Name <input id="itemName" value="Magic Wand" /></label>
+          <label>Max Stack <input id="itemStack" type="number" value="1" min="1" max="64" /></label>
+          <label>Creative Category
+            <select id="itemCategory"><option value="Equipment">Equipment</option><option value="Items">Items</option><option value="Nature">Nature</option><option value="Construction">Construction</option></select>
           </label>
+          <label><input id="itemCooldownOn" type="checkbox" checked /> Enable Cooldown</label>
+          <label>Cooldown Seconds <input id="itemCooldown" type="number" value="3" min="0" step="0.5" /></label>
         </div>
-        <button onclick="addStructureFunction()">Add Structure Spawn Function</button>
-        <div class="notice">
-          To use it in-game, run something like <code>/function spawn_structure</code>. Your structure ID becomes <code>namespace:file_name</code> unless you type a full <code>namespace:name</code> yourself.
-        </div>
-        <div class="list" id="structuresList"></div>
-      </section>
-
-      <section class="panel card" id="tab-functions">
-        <h2>Function Creator</h2>
-        <p class="muted">Create simple <code>.mcfunction</code> command files. One command per line. Do not include the slash.</p>
         <div class="grid two">
-          <label>Function Name<input id="functionName" value="hello_derp" /></label>
-          <label>Template
-            <select id="functionTemplate" onchange="applyFunctionTemplate()">
-              <option value="custom">Custom</option>
-              <option value="give">Give custom item</option>
-              <option value="lightning">Lightning around player</option>
-              <option value="night">Set night</option>
-            </select>
+          <label>Texture Source
+            <select id="itemTextureSource"><option value="pixel">Current Pixel Texture</option><option value="auto">Auto Color Texture</option></select>
           </label>
+          <label>Auto Texture Color <input id="itemColor" type="color" value="#4cc9f0" /></label>
         </div>
-        <label>Commands<textarea id="functionCommands">say Bed-Mod Maker exported this function!</textarea></label>
-        <button onclick="addFunction()">Add Function</button>
-        <div class="list" id="functionsList"></div>
+        <h3>When Used</h3>
+        <div class="grid three">
+          <label><input id="itemUseOn" type="checkbox" checked /> Run actions when used</label>
+          <label>Optional Function
+            <select id="itemUseFunction"></select>
+          </label>
+          <label>Extra Command <input id="itemUseCommand" placeholder="effect @s speed 5 1" /></label>
+        </div>
+        <button id="addItemBtn">Add / Update Item</button>
+        <div id="itemList" class="list"></div>
       </section>
 
-      <section class="panel card" id="tab-export">
-        <h2>Export Preview</h2>
-        <p class="muted">This is what will be added to the zip. The app builds everything locally in your browser.</p>
-        <div class="stats">
-          <div><b id="statItems">0</b><span>Items</span></div>
-          <div><b id="statRecipes">0</b><span>Recipes</span></div>
-          <div><b id="statStructures">0</b><span>Structures</span></div>
-          <div><b id="statFunctions">0</b><span>Functions</span></div>
+      <section class="panel" id="weapons">
+        <h2>Weapon Creator</h2>
+        <p class="hint">Creates a custom item with damage, durability, cooldown, and optional on-use commands. “Gun-ish” weapons use commands/functions for now.</p>
+        <div class="grid three">
+          <label>Weapon Type
+            <select id="weaponType"><option>Sword</option><option>Axe</option><option>Staff</option><option>Gun-ish Item</option><option>Lightning Tool</option><option>Structure Spawner</option></select>
+          </label>
+          <label>Weapon ID <input id="weaponId" value="derp_blade" /></label>
+          <label>Name <input id="weaponName" value="Derp Blade" /></label>
+          <label>Damage <input id="weaponDamage" type="number" value="8" /></label>
+          <label>Durability <input id="weaponDurability" type="number" value="250" /></label>
+          <label>Cooldown Seconds <input id="weaponCooldown" type="number" value="1" step="0.25" /></label>
         </div>
-        <button onclick="exportAddon()">Download Zip</button>
-        <button class="ghost" onclick="renderFileTree()">Refresh File Tree</button>
-        <pre id="fileTree"></pre>
+        <label>On Use Command(s), one per line<textarea id="weaponCommands" rows="5">playsound random.levelup @s</textarea></label>
+        <button id="addWeaponBtn">Create Weapon Item</button>
+      </section>
+
+      <section class="panel" id="textures">
+        <h2>Pixel Texture Editor</h2>
+        <div class="textureTools">
+          <label>Color <input type="color" id="paintColor" value="#4cc9f0" /></label>
+          <button id="pencilBtn" class="selected">Pencil</button>
+          <button id="eraserBtn">Eraser</button>
+          <button id="fillBtn">Fill</button>
+          <button id="clearCanvasBtn" class="danger">Clear</button>
+          <button id="downloadPngBtn">Download PNG</button>
+        </div>
+        <canvas id="pixelCanvas" width="512" height="512"></canvas>
+        <p class="hint">This is a 16x16 texture scaled up. Use it in the item, weapon, or block creator.</p>
+      </section>
+
+      <section class="panel" id="recipes">
+        <h2>Recipe Creator</h2>
+        <div class="grid three">
+          <label>Recipe ID <input id="recipeId" value="magic_wand_recipe" /></label>
+          <label>Result Item <input id="recipeResult" value="derp:magic_wand" /></label>
+          <label>Count <input id="recipeCount" type="number" value="1" min="1" max="64" /></label>
+        </div>
+        <h3>Shapeless Ingredients</h3>
+        <textarea id="recipeIngredients" rows="4">minecraft:stick
+minecraft:diamond</textarea>
+        <h3>Shaped 3x3 Pattern</h3>
+        <div class="craftGrid" id="craftGrid"></div>
+        <div class="cardRow"><button id="addShapelessBtn">Add Shapeless Recipe</button><button id="addShapedBtn">Add Shaped Recipe</button></div>
+        <div id="recipeList" class="list"></div>
+      </section>
+
+      <section class="panel" id="structures">
+        <h2>Structure Spawning</h2>
+        <p class="hint">Upload existing <code>.mcstructure</code> files, generate /structure load commands, and attach those to functions or items.</p>
+        <div class="grid three">
+          <label>Structure Name <input id="structureName" value="my_house" /></label>
+          <label>Spawn Offset <input id="structureOffset" value="~ ~ ~" /></label>
+          <label>.mcstructure File <input id="structureFile" type="file" accept=".mcstructure" /></label>
+        </div>
+        <div class="cardRow"><button id="addStructureBtn">Add Structure</button><button id="makeStructureCommandBtn">Make Load Command</button></div>
+        <textarea id="structureCommand" rows="2" readonly></textarea>
+        <div id="structureList" class="list"></div>
+      </section>
+
+      <section class="panel" id="blocks">
+        <h2>Advanced Block Creator</h2>
+        <div class="grid three">
+          <label>Block ID <input id="blockId" value="glow_block" /></label>
+          <label>Name <input id="blockName" value="Glow Block" /></label>
+          <label>Destroy Time <input id="blockDestroy" type="number" value="2" step="0.25" /></label>
+          <label>Explosion Resistance <input id="blockExplosion" type="number" value="6" /></label>
+          <label>Light Emission <input id="blockLight" type="number" value="8" min="0" max="15" /></label>
+          <label>Friction <input id="blockFriction" type="number" value="0.6" min="0" max="1" step="0.1" /></label>
+          <label><input id="blockCollision" type="checkbox" checked /> Has collision</label>
+          <label>Texture Color <input id="blockColor" type="color" value="#8a5cff" /></label>
+          <label>Drop Item <input id="blockDrop" value="self" /></label>
+        </div>
+        <button id="addBlockBtn">Add / Update Block</button>
+        <div id="blockList" class="list"></div>
+      </section>
+
+      <section class="panel" id="biomes">
+        <h2>Biome Creator</h2>
+        <p class="hint">Creates basic behavior-pack biome files plus resource-pack client biome visuals. Some biome generation behavior depends on the Minecraft version and world settings.</p>
+        <div class="grid three">
+          <label>Biome ID <input id="biomeId" value="derp_fields" /></label>
+          <label>Name <input id="biomeName" value="Derp Fields" /></label>
+          <label>Temperature <input id="biomeTemp" type="number" value="0.7" step="0.1" /></label>
+          <label>Downfall <input id="biomeDownfall" type="number" value="0.4" step="0.1" /></label>
+          <label>Grass Color <input id="biomeGrass" type="color" value="#62d96b" /></label>
+          <label>Sky Color <input id="biomeSky" type="color" value="#80c8ff" /></label>
+          <label>Surface Block <input id="biomeSurface" value="minecraft:grass_block" /></label>
+          <label>Underwater Block <input id="biomeUnder" value="minecraft:dirt" /></label>
+          <label>Tags <input id="biomeTags" value="overworld, animal, monster" /></label>
+        </div>
+        <button id="addBiomeBtn">Add / Update Biome</button>
+        <div id="biomeList" class="list"></div>
+      </section>
+
+      <section class="panel" id="worlds">
+        <h2>World Preset Designer</h2>
+        <p class="hint">No world editor here. This creates a readable preset file, a setup function, and install notes. Real importable world templates need a base exported world folder with level.dat.</p>
+        <div class="grid three">
+          <label>World Preset Name <input id="worldName" value="Derp Flat World" /></label>
+          <label>Type <select id="worldType"><option value="flat">Custom Flat</option><option value="infinite">Regular Infinite + Biomes</option></select></label>
+          <label>Gamemode <select id="worldGamemode"><option>creative</option><option>survival</option><option>adventure</option></select></label>
+          <label>Difficulty <select id="worldDifficulty"><option>peaceful</option><option>easy</option><option>normal</option><option>hard</option></select></label>
+          <label>Starting Items <input id="worldItems" value="minecraft:apple 16, minecraft:stone_pickaxe 1" /></label>
+          <label>Flat Layers <input id="worldLayers" value="bedrock:1,dirt:3,grass_block:1" /></label>
+        </div>
+        <button id="saveWorldPresetBtn">Save World Preset</button>
+        <div id="worldList" class="list"></div>
+      </section>
+
+      <section class="panel" id="export">
+        <h2>Export Preview</h2>
+        <p class="hint">This updates whenever you create things. The final zip includes BP, RP, textures, scripts, commands, recipes, structures, blocks, biomes, and notes.</p>
+        <div class="stats" id="stats"></div>
+        <pre id="filePreview"></pre>
       </section>
     </section>
   </main>
-
-  <footer>
-    Unofficial Bedrock add-on helper. Exported packs are starter templates, not magic Java-to-Bedrock converters.
-  </footer>
-
+  <div id="toast"></div>
   <script src="maker.js"></script>
 </body>
 </html>
