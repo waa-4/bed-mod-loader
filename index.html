@@ -1,232 +1,174 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bed-Mod Loader</title>
-
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
 <style>
-* {
-  box-sizing: border-box;
+:root{
+  --bg:#080512;
+  --panel:rgba(24,16,45,.88);
+  --panel2:rgba(37,25,72,.72);
+  --line:rgba(196,181,253,.28);
+  --line2:rgba(167,139,250,.45);
+  --text:#f5f3ff;
+  --muted:#d8b4fe;
+  --soft:#c4b5fd;
+  --purple:#8b5cf6;
+  --purple2:#4c1d95;
+  --green:#86efac;
+  --yellow:#fde68a;
+  --red:#fecaca;
 }
-
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: radial-gradient(circle at top, #211044, #080512 70%);
-  color: white;
-  min-height: 100vh;
-  overflow-x: hidden;
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  font-family:Arial, Helvetica, sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(139,92,246,.35), transparent 34%),
+    radial-gradient(circle at 85% 20%, rgba(59,130,246,.14), transparent 28%),
+    linear-gradient(180deg,#10072a 0%,var(--bg) 70%);
+  min-height:100vh;
+  overflow-x:hidden;
 }
-
-canvas {
-  position: fixed;
-  inset: 0;
-  z-index: -2;
+canvas{position:fixed;inset:0;z-index:-3}
+.gridGlow{
+  position:fixed;inset:0;z-index:-2;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(196,181,253,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(196,181,253,.045) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:linear-gradient(to bottom, black, transparent 82%);
 }
-
-.bottom-glow {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 180px;
-  background: linear-gradient(to top, rgba(139,92,246,0.48), transparent);
-  z-index: -1;
-  pointer-events: none;
+.bottom-glow{position:fixed;bottom:0;left:0;width:100%;height:210px;background:linear-gradient(to top,rgba(139,92,246,.42),transparent);z-index:-1;pointer-events:none}
+a{color:inherit}
+header{
+  width:min(1180px,94%);
+  margin:auto;
+  padding:34px 0 16px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
 }
-
-header {
-  text-align: center;
-  padding: 35px 15px 20px;
+.logo{display:flex;align-items:center;gap:12px;font-weight:900;letter-spacing:.4px}
+.logoMark{
+  width:42px;height:42px;border-radius:14px;
+  display:grid;place-items:center;
+  background:linear-gradient(135deg,#a78bfa,#5b21b6);
+  box-shadow:0 0 24px rgba(139,92,246,.55);
 }
-
-h1 {
-  margin: 0;
-  font-size: 44px;
-  color: #c4b5fd;
-  text-shadow: 0 0 18px #7c3aed;
+nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.navBtn,.pillBtn,button{
+  background:rgba(255,255,255,.075);
+  color:white;
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:10px 13px;
+  text-decoration:none;
+  cursor:pointer;
+  transition:.18s ease;
+  font-weight:700;
 }
-
-.subtitle {
-  color: #d8b4fe;
-  margin-top: 8px;
+.navBtn:hover,.pillBtn:hover,button:hover{transform:translateY(-1px);filter:brightness(1.16);border-color:var(--line2)}
+.primary{
+  background:linear-gradient(135deg,#8b5cf6,#4c1d95);
+  border-color:rgba(196,181,253,.38);
+  box-shadow:0 10px 26px rgba(76,29,149,.28);
 }
-
-.container {
-  width: min(1150px, 94%);
-  margin: auto;
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 18px;
+.hero{
+  width:min(1180px,94%);
+  margin:18px auto 18px;
+  display:grid;
+  grid-template-columns:1.08fr .92fr;
+  gap:18px;
+  align-items:stretch;
 }
-
-.card {
-  background: rgba(24, 16, 45, 0.88);
-  border: 1px solid rgba(167,139,250,0.35);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: 0 0 25px rgba(124,58,237,0.16);
-  backdrop-filter: blur(5px);
+.heroCard,.card{
+  background:linear-gradient(180deg,rgba(31,21,58,.92),rgba(18,12,34,.88));
+  border:1px solid var(--line);
+  border-radius:24px;
+  box-shadow:0 0 32px rgba(124,58,237,.18);
+  backdrop-filter:blur(8px);
 }
-
-.card h2 {
-  margin-top: 0;
-  color: #ddd6fe;
+.heroCard{padding:30px;position:relative;overflow:hidden;min-height:360px}
+.heroCard:after{
+  content:"";position:absolute;right:-90px;top:-90px;width:260px;height:260px;border-radius:50%;
+  background:radial-gradient(circle,rgba(167,139,250,.28),transparent 70%);
 }
-
-.drop-zone {
-  border: 2px dashed #8b5cf6;
-  border-radius: 16px;
-  padding: 35px;
-  text-align: center;
-  background: rgba(139,92,246,0.08);
-  transition: 0.2s;
-}
-
-.drop-zone.dragover {
-  background: rgba(139,92,246,0.22);
-  box-shadow: 0 0 25px #8b5cf6;
-  transform: scale(1.01);
-}
-
-button {
-  background: linear-gradient(135deg, #7c3aed, #4c1d95);
-  color: white;
-  border: none;
-  border-radius: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  margin-top: 10px;
-}
-
-button:hover {
-  filter: brightness(1.18);
-}
-
-button.secondary {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(167,139,250,0.35);
-}
-
-input {
-  width: 100%;
-  padding: 10px;
-  border-radius: 10px;
-  border: none;
-  outline: none;
-  background: rgba(255,255,255,0.08);
-  color: white;
-  margin-bottom: 8px;
-}
-
-.file-list {
-  margin-top: 12px;
-}
-
-.file-item {
-  background: rgba(255,255,255,0.06);
-  padding: 12px;
-  border-radius: 12px;
-  margin-bottom: 10px;
-  border-left: 3px solid #a78bfa;
-}
-
-.file-title {
-  font-weight: bold;
-  color: #f5f3ff;
-}
-
-.badge {
-  display: inline-block;
-  background: rgba(167,139,250,0.18);
-  border: 1px solid rgba(167,139,250,0.35);
-  color: #ddd6fe;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  margin-top: 6px;
-  margin-right: 4px;
-}
-
-.badge.good {
-  background: rgba(34,197,94,0.16);
-  border-color: rgba(34,197,94,0.35);
-  color: #bbf7d0;
-}
-
-.badge.warn {
-  background: rgba(234,179,8,0.16);
-  border-color: rgba(234,179,8,0.4);
-  color: #fde68a;
-}
-
-.badge.bad {
-  background: rgba(239,68,68,0.16);
-  border-color: rgba(239,68,68,0.38);
-  color: #fecaca;
-}
-
-.details {
-  font-size: 13px;
-  color: #d8b4fe;
-  margin-top: 8px;
-  line-height: 1.45;
-}
-
-.guide code {
-  color: #c4b5fd;
-  word-break: break-all;
-}
-
-.warning {
-  color: #fcd34d;
-  font-size: 14px;
-}
-
-.small {
-  font-size: 13px;
-  color: #c4b5fd;
-}
-
-.tool-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-footer {
-  text-align: center;
-  color: #a78bfa;
-  padding: 25px;
-  font-size: 13px;
-}
-
-@media (max-width: 800px) {
-  .container {
-    grid-template-columns: 1fr;
-  }
-
-  h1 {
-    font-size: 34px;
-  }
-}
+.kicker{color:var(--soft);font-weight:900;text-transform:uppercase;letter-spacing:1.8px;font-size:12px}
+h1{margin:10px 0 8px;font-size:clamp(38px,7vw,76px);line-height:.92;color:#eee7ff;text-shadow:0 0 22px rgba(124,58,237,.82)}
+.subtitle{color:var(--muted);font-size:18px;line-height:1.58;max-width:700px}
+.heroActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:22px}
+.stat{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:16px;padding:13px}
+.stat b{display:block;font-size:22px;color:white}.stat span{font-size:12px;color:var(--soft)}
+.panelPreview{padding:18px;display:flex;flex-direction:column;gap:12px}
+.fakeWindow{border:1px solid var(--line);border-radius:18px;background:rgba(8,5,18,.55);overflow:hidden}
+.fakeTop{display:flex;gap:6px;padding:11px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.05)}
+.dot{width:10px;height:10px;border-radius:50%;background:#a78bfa}.dot:nth-child(2){background:#c084fc}.dot:nth-child(3){background:#ddd6fe}
+.fakeBody{padding:14px}.fakeLine{height:12px;background:rgba(196,181,253,.18);border-radius:10px;margin:10px 0}.fakeLine.w60{width:60%}.fakeLine.w80{width:80%}.fakeLine.w45{width:45%}
+.miniCards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mini{padding:13px;border:1px solid var(--line);background:rgba(255,255,255,.055);border-radius:16px}.mini b{display:block}.mini span{display:block;margin-top:6px;color:var(--soft);font-size:12px;line-height:1.35}
+.container{width:min(1180px,94%);margin:0 auto 20px;display:grid;grid-template-columns:1.18fr .82fr;gap:18px}.card{padding:18px}h2{margin:0 0 12px;color:#eee7ff}.card p{color:var(--muted);line-height:1.5}.drop-zone{border:2px dashed #8b5cf6;border-radius:20px;padding:34px;text-align:center;background:rgba(139,92,246,.08);transition:.2s}.drop-zone.dragover{background:rgba(139,92,246,.22);box-shadow:0 0 28px #8b5cf6;transform:scale(1.01)}.drop-zone h3{margin:0 0 8px}input{width:100%;padding:11px;border-radius:12px;border:1px solid var(--line);outline:none;background:rgba(255,255,255,.08);color:white;margin-bottom:8px}input::placeholder{color:#b8a6de}.tool-row{display:flex;gap:8px;flex-wrap:wrap}.file-list{margin-top:12px}.file-item{background:rgba(255,255,255,.06);padding:13px;border-radius:16px;margin-bottom:10px;border-left:3px solid #a78bfa}.file-title{font-weight:900;color:#fff}.badge{display:inline-block;background:rgba(167,139,250,.18);border:1px solid rgba(167,139,250,.35);color:#ddd6fe;padding:4px 9px;border-radius:999px;font-size:12px;margin-top:6px;margin-right:4px}.badge.good{background:rgba(34,197,94,.16);border-color:rgba(34,197,94,.35);color:var(--green)}.badge.warn{background:rgba(234,179,8,.16);border-color:rgba(234,179,8,.4);color:var(--yellow)}.badge.bad{background:rgba(239,68,68,.16);border-color:rgba(239,68,68,.38);color:var(--red)}.details{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.45}.guide code{display:block;color:#ddd6fe;word-break:break-all;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:12px;padding:10px}.warning{color:#fcd34d!important;font-size:14px}.small{font-size:13px;color:var(--soft)!important}.featureGrid{width:min(1180px,94%);margin:18px auto 0;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.feature{padding:16px;border-radius:20px;background:rgba(24,16,45,.72);border:1px solid var(--line)}.feature strong{display:block;margin-bottom:6px}.feature span{color:var(--soft);font-size:13px;line-height:1.35}.footer{text-align:center;color:#a78bfa;padding:28px;font-size:13px}.makerNotice{border:1px solid rgba(134,239,172,.25);background:rgba(34,197,94,.08);border-radius:16px;padding:14px;margin-top:12px}.makerNotice b{color:#bbf7d0}
+@media(max-width:900px){header{align-items:flex-start;flex-direction:column}.hero,.container{grid-template-columns:1fr}.featureGrid{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr}h1{font-size:46px}}
+@media(max-width:560px){.featureGrid,.miniCards{grid-template-columns:1fr}.heroCard,.card{border-radius:18px;padding:16px}.drop-zone{padding:22px}.navBtn,.pillBtn,button{width:100%;text-align:center}nav,.heroActions,.tool-row{width:100%;flex-direction:column}.logoMark{width:38px;height:38px}}
 </style>
 </head>
-
 <body>
-
 <canvas id="stars"></canvas>
+<div class="gridGlow"></div>
 <div class="bottom-glow"></div>
 
 <header>
-  <h1>Bed-Mod Loader</h1>
-  <div class="subtitle">A purple Bedrock pack helper, checker, zip converter, and future mod generator.</div>
+  <div class="logo"><div class="logoMark">⬡</div><div>Bed-Mod Loader</div></div>
+  <nav>
+    <a class="navBtn" href="#checker">Pack Checker</a>
+    <a class="navBtn primary" href="maker/">Open Maker</a>
+    <a class="navBtn" href="#guide">Install Guide</a>
+  </nav>
 </header>
 
-<div class="container">
+<section class="hero">
+  <div class="heroCard">
+    <div class="kicker">Bedrock pack helper + mod maker launcher</div>
+    <h1>Bed-Mod<br>Loader</h1>
+    <p class="subtitle">Check Bedrock packs, convert valid zip packs into Minecraft file types, and jump into the new maker to build simple Bedrock add-ons that export as zip files.</p>
+    <div class="heroActions">
+      <a class="pillBtn primary" href="maker/">Launch Mod Maker</a>
+      <a class="pillBtn" href="#checker">Check a Pack</a>
+      <a class="pillBtn" href="https://www.curseforge.com/minecraft-bedrock" target="_blank" rel="noopener">CurseForge Bedrock</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>.zip</b><span>Preferred export format</span></div>
+      <div class="stat"><b>BP + RP</b><span>Behavior/resource pair</span></div>
+      <div class="stat"><b>Maker</b><span>Items, recipes, functions, structures</span></div>
+    </div>
+  </div>
 
+  <div class="heroCard panelPreview">
+    <div class="fakeWindow">
+      <div class="fakeTop"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <div class="fakeBody">
+        <div class="fakeLine w80"></div>
+        <div class="fakeLine w60"></div>
+        <div class="fakeLine w45"></div>
+        <div class="makerNotice"><b>New:</b> put the maker folder in the repo root and this button opens <code>/bed-mod-loader/maker</code>.</div>
+      </div>
+    </div>
+    <div class="miniCards">
+      <div class="mini"><b>Loader</b><span>Reads packs and checks manifest structure.</span></div>
+      <div class="mini"><b>Maker</b><span>Creates add-on zip exports with simple tools.</span></div>
+      <div class="mini"><b>Structures</b><span>Uses imported .mcstructure files and functions.</span></div>
+      <div class="mini"><b>Safe</b><span>Does not pretend Java .jar mods are Bedrock packs.</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="container" id="checker">
   <div class="card">
     <h2>Drop Packs Here</h2>
     <div class="drop-zone" id="dropZone">
@@ -238,14 +180,15 @@ footer {
 
     <div class="tool-row">
       <button class="secondary" onclick="clearFiles()">Clear Results</button>
+      <a class="pillBtn primary" href="maker/">Open Maker</a>
     </div>
 
     <div class="file-list" id="fileList"></div>
   </div>
 
-  <div class="card guide">
+  <div class="card guide" id="guide">
     <h2>Install Guide</h2>
-    <p class="warning">Browsers cannot auto-move files into Minecraft folders, but this tool can check and convert valid Bedrock zips.</p>
+    <p class="warning">Browsers cannot auto-move files into Minecraft folders, but this tool can check, rename, and create downloadable pack zips.</p>
 
     <p><b>Normal Bedrock path:</b></p>
     <code>%LocalAppData%\Packages\Microsoft.MinecraftUWP_8wekyb3d8bbwe\LocalState\games\com.mojang</code>
@@ -268,300 +211,117 @@ footer {
   </div>
 
   <div class="card">
-    <h2>Starter Tools</h2>
-    <button onclick="alert('Coming soon: starter pack generator!')">Generate Starter Pack</button>
-    <button onclick="alert('Coming soon: display entity template!')">Create Display Entity</button>
-    <button onclick="alert('The checker is active: drop a zip or pack file on the left!')">Check Pack Structure</button>
-    <p class="small">Next good upgrade: a real starter pack generator that creates a downloadable zip directly in the browser.</p>
+    <h2>Creator Tools</h2>
+    <p>The old placeholder buttons now point to the real maker page.</p>
+    <div class="tool-row">
+      <a class="pillBtn primary" href="maker/">Generate Starter Pack</a>
+      <a class="pillBtn" href="maker/">Create Items</a>
+      <a class="pillBtn" href="maker/">Structure Spawning</a>
+    </div>
+    <p class="small">The maker exports a zip so you can convert or import it however you like.</p>
   </div>
-
 </div>
 
-<footer>
-  Bed-Mod Loader is unofficial. Java .jar mods cannot magically convert into Bedrock add-ons.
-</footer>
+<section class="featureGrid">
+  <div class="feature"><strong>Pack Checker</strong><span>Scans zip contents for manifests, behavior folders, resource folders, and obvious issues.</span></div>
+  <div class="feature"><strong>Zip Converter</strong><span>Renames valid zips into .mcpack or .mcaddon when the structure looks right.</span></div>
+  <div class="feature"><strong>Mod Maker Link</strong><span>Launches the new maker folder from the main page.</span></div>
+  <div class="feature"><strong>Structure Workflow</strong><span>The maker can package imported .mcstructure files and generate load functions.</span></div>
+</section>
+
+<div class="footer">Bed-Mod Loader is unofficial. Java .jar mods cannot magically convert into Bedrock add-ons.</div>
 
 <script>
 const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
 const fileList = document.getElementById("fileList");
-
 window.pendingZipFiles = {};
-
-function clearFiles() {
-  fileList.innerHTML = "";
-  window.pendingZipFiles = {};
-}
-
-function escapeName(name) {
-  return name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-}
-
-function normalizePath(path) {
-  return path.replace(/\\/g, "/").toLowerCase();
-}
-
-function detectPackKind(fileNames) {
-  const names = fileNames.map(normalizePath);
-
-  const hasManifest = names.some(n => n.endsWith("manifest.json"));
-
-  const hasEntities = names.some(n => n.includes("/entities/") || n.startsWith("entities/"));
-  const hasFunctions = names.some(n => n.includes("/functions/") || n.startsWith("functions/"));
-  const hasLootTables = names.some(n => n.includes("/loot_tables/") || n.startsWith("loot_tables/"));
-  const hasRecipes = names.some(n => n.includes("/recipes/") || n.startsWith("recipes/"));
-
-  const hasTextures = names.some(n => n.includes("/textures/") || n.startsWith("textures/"));
-  const hasModels = names.some(n => n.includes("/models/") || n.startsWith("models/"));
-  const hasClientEntity = names.some(n => n.includes("/entity/") || n.startsWith("entity/"));
-  const hasSounds = names.some(n => n.includes("/sounds/") || n.startsWith("sounds/"));
-
-  let kind = "Unknown Bedrock Pack";
-  let confidence = "warn";
-  let reasons = [];
-
-  if (!hasManifest) {
-    return {
-      kind: "Not a valid Bedrock pack yet",
-      confidence: "bad",
-      reasons: ["No manifest.json found."]
-    };
+function clearFiles(){fileList.innerHTML="";window.pendingZipFiles={};}
+function escapeName(name){return name.replace(/\\/g,"\\\\").replace(/'/g,"\\'");}
+function normalizePath(path){return path.replace(/\\/g,"/").toLowerCase();}
+function detectPackKind(fileNames){
+  const names=fileNames.map(normalizePath);
+  const hasManifest=names.some(n=>n.endsWith("manifest.json"));
+  const hasEntities=names.some(n=>n.includes("/entities/")||n.startsWith("entities/"));
+  const hasFunctions=names.some(n=>n.includes("/functions/")||n.startsWith("functions/"));
+  const hasLootTables=names.some(n=>n.includes("/loot_tables/")||n.startsWith("loot_tables/"));
+  const hasRecipes=names.some(n=>n.includes("/recipes/")||n.startsWith("recipes/"));
+  const hasItems=names.some(n=>n.includes("/items/")||n.startsWith("items/"));
+  const hasStructures=names.some(n=>n.includes("/structures/")||n.startsWith("structures/"));
+  const hasTextures=names.some(n=>n.includes("/textures/")||n.startsWith("textures/"));
+  const hasModels=names.some(n=>n.includes("/models/")||n.startsWith("models/"));
+  const hasClientEntity=names.some(n=>n.includes("/entity/")||n.startsWith("entity/"));
+  const hasSounds=names.some(n=>n.includes("/sounds/")||n.startsWith("sounds/"));
+  let kind="Unknown Bedrock Pack",confidence="warn",reasons=[];
+  if(!hasManifest){return{kind:"Not a valid Bedrock pack yet",confidence:"bad",reasons:["No manifest.json found."]};}
+  if(hasEntities||hasFunctions||hasLootTables||hasRecipes||hasItems||hasStructures){
+    kind="Behavior Pack";confidence="good";
+    if(hasEntities)reasons.push("Has entities folder.");
+    if(hasFunctions)reasons.push("Has functions folder.");
+    if(hasLootTables)reasons.push("Has loot_tables folder.");
+    if(hasRecipes)reasons.push("Has recipes folder.");
+    if(hasItems)reasons.push("Has items folder.");
+    if(hasStructures)reasons.push("Has structures folder.");
   }
-
-  if (hasEntities || hasFunctions || hasLootTables || hasRecipes) {
-    kind = "Behavior Pack";
-    confidence = "good";
-    if (hasEntities) reasons.push("Has entities folder.");
-    if (hasFunctions) reasons.push("Has functions folder.");
-    if (hasLootTables) reasons.push("Has loot_tables folder.");
-    if (hasRecipes) reasons.push("Has recipes folder.");
+  if(hasTextures||hasModels||hasClientEntity||hasSounds){
+    if(kind==="Behavior Pack"){kind="Mixed Pack / Add-on Folder";confidence="warn";}else{kind="Resource Pack";confidence="good";}
+    if(hasTextures)reasons.push("Has textures folder.");
+    if(hasModels)reasons.push("Has models folder.");
+    if(hasClientEntity)reasons.push("Has client entity folder.");
+    if(hasSounds)reasons.push("Has sounds folder.");
   }
-
-  if (hasTextures || hasModels || hasClientEntity || hasSounds) {
-    if (kind === "Behavior Pack") {
-      kind = "Mixed Pack / Add-on Folder";
-      confidence = "warn";
-    } else {
-      kind = "Resource Pack";
-      confidence = "good";
-    }
-
-    if (hasTextures) reasons.push("Has textures folder.");
-    if (hasModels) reasons.push("Has models folder.");
-    if (hasClientEntity) reasons.push("Has client entity folder.");
-    if (hasSounds) reasons.push("Has sounds folder.");
-  }
-
-  if (reasons.length === 0) {
-    reasons.push("Has manifest.json, but no obvious BP/RP folders found.");
-  }
-
-  return { kind, confidence, reasons };
+  if(reasons.length===0)reasons.push("Has manifest.json, but no obvious BP/RP folders found.");
+  return{kind,confidence,reasons};
 }
-
-async function analyzeZip(file) {
-  const zip = await JSZip.loadAsync(file);
-  const names = Object.keys(zip.files);
-  const manifestFiles = names.filter(n => normalizePath(n).endsWith("manifest.json"));
-  const manifestCount = manifestFiles.length;
-
-  const detector = detectPackKind(names);
-
-  let suggestedOutput = null;
-  let outputReason = "";
-
-  if (manifestCount === 1) {
-    suggestedOutput = "mcpack";
-    outputReason = "1 manifest found, so this is probably one pack.";
-  } else if (manifestCount >= 2) {
-    suggestedOutput = "mcaddon";
-    outputReason = manifestCount + " manifests found, so this is probably multiple packs.";
-  } else {
-    outputReason = "No manifest found, so conversion is not recommended.";
-  }
-
-  return {
-    names,
-    manifestFiles,
-    manifestCount,
-    detector,
-    suggestedOutput,
-    outputReason
-  };
+async function analyzeZip(file){
+  const zip=await JSZip.loadAsync(file);
+  const names=Object.keys(zip.files);
+  const manifestFiles=names.filter(n=>normalizePath(n).endsWith("manifest.json"));
+  const manifestCount=manifestFiles.length;
+  const detector=detectPackKind(names);
+  let suggestedOutput=null,outputReason="";
+  if(manifestCount===1){suggestedOutput="mcpack";outputReason="1 manifest found, so this is probably one pack.";}
+  else if(manifestCount>=2){suggestedOutput="mcaddon";outputReason=manifestCount+" manifests found, so this is probably multiple packs.";}
+  else{outputReason="No manifest found, so conversion is not recommended.";}
+  return{names,manifestFiles,manifestCount,detector,suggestedOutput,outputReason};
 }
-
-async function addFiles(files) {
-  for (const file of files) {
-    const item = document.createElement("div");
-    item.className = "file-item";
-
-    let type = "Unknown";
-    let extra = "";
-    const lower = file.name.toLowerCase();
-
-    if (lower.endsWith(".mcpack")) {
-      type = "Minecraft Pack";
-      extra = `
-        <br><span class="badge good">Ready to import</span>
-        <div class="details">This should be a single Bedrock pack. If it fails, rename it to .zip and drop it here to inspect the inside.</div>
-      `;
+async function addFiles(files){
+  for(const file of files){
+    const item=document.createElement("div");item.className="file-item";
+    let type="Unknown",extra="";const lower=file.name.toLowerCase();
+    if(lower.endsWith(".mcpack")){type="Minecraft Pack";extra=`<br><span class="badge good">Ready to import</span><div class="details">This should be a single Bedrock pack. If it fails, rename it to .zip and drop it here to inspect the inside.</div>`;}
+    else if(lower.endsWith(".mcaddon")){type="Minecraft Add-on";extra=`<br><span class="badge good">Ready to import</span><div class="details">This usually contains both behavior and resource packs.</div>`;}
+    else if(lower.endsWith(".jar")){type="Java Mod";extra=`<br><span class="badge bad">Not convertible</span><div class="details">Java .jar mods are for Java Edition mod loaders like Forge/Fabric. They cannot be renamed into Bedrock packs.</div>`;}
+    else if(lower.endsWith(".zip")){
+      type="Zip Archive";
+      try{
+        const result=await analyzeZip(file);window.pendingZipFiles[file.name]=file;
+        const badgeClass=result.detector.confidence;
+        const reasonList=result.detector.reasons.map(r=>`<li>${r}</li>`).join("");
+        extra=`<br><span class="badge ${badgeClass}">${result.detector.kind}</span><span class="badge">${result.manifestCount} manifest(s)</span><div class="details">${result.outputReason}<ul>${reasonList}</ul></div>`;
+        if(result.suggestedOutput){extra+=`<button onclick="convertZipFile('${escapeName(file.name)}','${result.suggestedOutput}')">Convert to .${result.suggestedOutput}</button>`;}else{extra+=`<br><span class="badge bad">Conversion not recommended</span>`;}
+      }catch(err){extra=`<br><span class="badge bad">Could not read zip</span>`;}
     }
-
-    else if (lower.endsWith(".mcaddon")) {
-      type = "Minecraft Add-on";
-      extra = `
-        <br><span class="badge good">Ready to import</span>
-        <div class="details">This usually contains both behavior and resource packs.</div>
-      `;
-    }
-
-    else if (lower.endsWith(".jar")) {
-      type = "Java Mod";
-      extra = `
-        <br><span class="badge bad">Not convertible</span>
-        <div class="details">Java .jar mods are for Java Edition mod loaders like Forge/Fabric. They cannot be renamed into Bedrock packs.</div>
-      `;
-    }
-
-    else if (lower.endsWith(".zip")) {
-      type = "Zip Archive";
-
-      try {
-        const result = await analyzeZip(file);
-        window.pendingZipFiles[file.name] = file;
-
-        const badgeClass = result.detector.confidence;
-        const reasonList = result.detector.reasons.map(r => `<li>${r}</li>`).join("");
-
-        extra = `
-          <br><span class="badge ${badgeClass}">${result.detector.kind}</span>
-          <span class="badge">${result.manifestCount} manifest(s)</span>
-          <div class="details">
-            ${result.outputReason}
-            <ul>${reasonList}</ul>
-          </div>
-        `;
-
-        if (result.suggestedOutput) {
-          extra += `<button onclick="convertZipFile('${escapeName(file.name)}', '${result.suggestedOutput}')">Convert to .${result.suggestedOutput}</button>`;
-        } else {
-          extra += `<br><span class="badge bad">Conversion not recommended</span>`;
-        }
-
-      } catch (err) {
-        extra = `<br><span class="badge bad">Could not read zip</span>`;
-      }
-    }
-
-    item.innerHTML = `
-      <div class="file-title">${file.name}</div>
-      Size: ${(file.size / 1024).toFixed(1)} KB<br>
-      <span class="badge">${type}</span>
-      ${extra}
-    `;
-
+    item.innerHTML=`<div class="file-title">${file.name}</div>Size: ${(file.size/1024).toFixed(1)} KB<br><span class="badge">${type}</span>${extra}`;
     fileList.appendChild(item);
   }
 }
-
-async function convertZipFile(fileName, outputType) {
-  const file = window.pendingZipFiles[fileName];
-  if (!file) {
-    alert("File not found.");
-    return;
-  }
-
-  const arrayBuffer = await file.arrayBuffer();
-  const blob = new Blob([arrayBuffer], { type: "application/zip" });
-
-  const newName = file.name.replace(/\.zip$/i, "." + outputType);
-
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = newName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+async function convertZipFile(fileName,outputType){
+  const file=window.pendingZipFiles[fileName];if(!file){alert("File not found.");return;}
+  const arrayBuffer=await file.arrayBuffer();const blob=new Blob([arrayBuffer],{type:"application/zip"});
+  const newName=file.name.replace(/\.zip$/i,"."+outputType);
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=newName;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
-
-dropZone.addEventListener("dragover", e => {
-  e.preventDefault();
-  dropZone.classList.add("dragover");
-});
-
-dropZone.addEventListener("dragleave", () => {
-  dropZone.classList.remove("dragover");
-});
-
-dropZone.addEventListener("drop", e => {
-  e.preventDefault();
-  dropZone.classList.remove("dragover");
-  addFiles(e.dataTransfer.files);
-});
-
-fileInput.addEventListener("change", () => {
-  addFiles(fileInput.files);
-});
-
-function searchCurseForge() {
-  const query = document.getElementById("curseSearch").value.trim();
-  if (!query) {
-    window.open("https://www.curseforge.com/minecraft-bedrock", "_blank");
-    return;
-  }
-
-  const url = "https://www.curseforge.com/minecraft-bedrock/search?search=" + encodeURIComponent(query);
-  window.open(url, "_blank");
-}
-
-function openBedrockPage() {
-  window.open("https://www.curseforge.com/minecraft-bedrock", "_blank");
-}
-
-/* Stars */
-const canvas = document.getElementById("stars");
-const ctx = canvas.getContext("2d");
-
-function resize() {
-  canvas.width = innerWidth;
-  canvas.height = innerHeight;
-}
-resize();
-addEventListener("resize", resize);
-
-const stars = [];
-for (let i = 0; i < 130; i++) {
-  stars.push({
-    x: Math.random() * innerWidth,
-    y: Math.random() * innerHeight,
-    r: Math.random() * 1.8 + 0.35,
-    s: Math.random() * 0.25 + 0.05,
-    alpha: Math.random() * 0.7 + 0.3
-  });
-}
-
-function drawStars() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  for (const star of stars) {
-    ctx.fillStyle = `rgba(196,181,253,${star.alpha})`;
-    ctx.beginPath();
-    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-    ctx.fill();
-
-    star.y += star.s;
-    if (star.y > canvas.height) {
-      star.y = -5;
-      star.x = Math.random() * canvas.width;
-    }
-  }
-
-  requestAnimationFrame(drawStars);
-}
-drawStars();
+dropZone.addEventListener("dragover",e=>{e.preventDefault();dropZone.classList.add("dragover");});
+dropZone.addEventListener("dragleave",()=>dropZone.classList.remove("dragover"));
+dropZone.addEventListener("drop",e=>{e.preventDefault();dropZone.classList.remove("dragover");addFiles(e.dataTransfer.files);});
+fileInput.addEventListener("change",()=>addFiles(fileInput.files));
+function searchCurseForge(){const query=document.getElementById("curseSearch").value.trim();if(!query){window.open("https://www.curseforge.com/minecraft-bedrock","_blank");return;}window.open("https://www.curseforge.com/minecraft-bedrock/search?search="+encodeURIComponent(query),"_blank");}
+function openBedrockPage(){window.open("https://www.curseforge.com/minecraft-bedrock","_blank");}
+const canvas=document.getElementById("stars"),ctx=canvas.getContext("2d");
+function resize(){canvas.width=innerWidth;canvas.height=innerHeight;}resize();addEventListener("resize",resize);
+const stars=[];for(let i=0;i<155;i++){stars.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*1.8+.35,s:Math.random()*.25+.05,alpha:Math.random()*.7+.3});}
+function drawStars(){ctx.clearRect(0,0,canvas.width,canvas.height);for(const star of stars){ctx.fillStyle=`rgba(196,181,253,${star.alpha})`;ctx.beginPath();ctx.arc(star.x,star.y,star.r,0,Math.PI*2);ctx.fill();star.y+=star.s;if(star.y>canvas.height){star.y=-5;star.x=Math.random()*canvas.width;}}requestAnimationFrame(drawStars);}drawStars();
 </script>
-
 </body>
 </html>
