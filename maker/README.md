@@ -1,25 +1,20 @@
-# Bed-Mod Maker V2
+# Bed-Mod Maker V2 Organized UI
 
 Drop this `maker/` folder into the root of the `bed-mod-loader` GitHub Pages repo.
 
-It adds:
+It keeps the older maker layout style while keeping V2 tools:
 
+- Project setup
 - Commands Builder
 - Function Builder
-- Item Creator with cooldowns and on-use actions
-- Weapon Creator presets
-- 16x16 pixel texture editor
-- Shapeless and shaped recipe creator
-- `.mcstructure` upload and structure spawn command/function generator
-- Advanced custom block creator
-- Basic biome creator
-- World Preset Designer without world-file editing
-- ZIP export with Behavior Pack and Resource Pack folders
+- Item Creator with cooldown/use actions
+- Weapon Creator
+- Pixel Texture Editor
+- Recipes
+- Structure spawning helpers
+- Advanced Block Creator
+- Biome Creator
+- World Preset Designer
+- Add-on zip export
 
-## Important World Preset Note
-
-This V2 intentionally does not edit uploaded Bedrock worlds. The World Preset Designer exports readable preset files and setup functions. Fully importable world templates normally require an exported Minecraft world folder containing files such as `level.dat`, which this tool does not create from scratch.
-
-## Item Use Actions
-
-Item use actions are generated through `BP/scripts/main.js`. Some Minecraft versions may ask you to enable creator/script experiment toggles before script-powered item actions work.
+This version intentionally does not include a Bedrock world editor, because editing uploaded Bedrock world database files in-browser can corrupt worlds.
