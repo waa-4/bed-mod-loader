@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bed-Mod Maker V2</title>
+  <title>Bed-Mod Maker V3</title>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -52,13 +52,16 @@
           <label>Project Name<input id="projectName" value="Derp Addon" /></label>
           <label>Namespace<input id="namespace" value="derp" /></label>
           <label>Author<input id="author" value="waa-4" /></label>
-          <label>Description<input id="description" value="Made with Bed-Mod Maker V2" /></label>
+          <label>Description<input id="description" value="Made with Bed-Mod Maker V3" /></label>
         </div>
         <div class="notice">
           <b>Tip:</b> use lowercase ids like <code>magic_wand</code>. Your namespace turns items into IDs like <code>derp:magic_wand</code>.
         </div>
         <div class="tool-row">
           <button id="quickDemoBtn">Add Demo Stuff</button>
+          <button id="saveProjectBtn">Save Maker Project</button>
+          <label>Load Project<input id="loadProjectFile" type="file" accept=".kermit,.json,application/json" /></label>
+          <button id="loadProjectBtn">Load Maker Project</button>
           <button id="clearProjectBtn" class="danger-lite">Clear Created Things</button>
         </div>
       </section>
@@ -117,7 +120,7 @@
           <label>Cooldown Seconds<input id="itemCooldown" type="number" value="3" min="0" step="0.5" /></label>
         </div>
         <div class="grid two">
-          <label>Texture Source<select id="itemTextureSource"><option value="pixel">Current Pixel Texture</option><option value="auto">Auto Color Texture</option></select></label>
+          <label>Texture Source<select id="itemTextureSource"><option value="pixel">Current Pixel Texture</option><option value="imported">Imported PNG Texture</option><option value="auto">Auto Color Texture</option></select></label>
           <label>Auto Texture Color<input id="itemColor" type="color" value="#4cc9f0" /></label>
         </div>
         <div class="subcard">
@@ -156,6 +159,8 @@
           <button id="eraserBtn">Eraser</button>
           <button id="fillBtn">Fill</button>
           <button id="clearCanvasBtn" class="danger-lite">Clear</button>
+          <label>Import PNG<input id="textureImport" type="file" accept="image/png" /></label>
+          <button id="importTextureBtn">Load PNG into Editor</button>
           <button id="downloadPngBtn">Download PNG</button>
         </div>
         <div class="pixel-wrap"><canvas id="pixelCanvas" width="512" height="512"></canvas></div>
@@ -206,7 +211,9 @@ minecraft:diamond</textarea>
           <label>Light Emission<input id="blockLight" type="number" value="8" min="0" max="15" /></label>
           <label>Friction<input id="blockFriction" type="number" value="0.6" min="0" max="1" step="0.1" /></label>
           <label class="check"><input id="blockCollision" type="checkbox" checked /> Has collision</label>
+          <label>Texture Source<select id="blockTextureSource"><option value="pixel">Current Pixel Texture</option><option value="imported">Imported PNG Texture</option><option value="auto">Auto Color Texture</option></select></label>
           <label>Texture Color<input id="blockColor" type="color" value="#8a5cff" /></label>
+          <label>Render Method<select id="blockRender"><option value="opaque">Opaque</option><option value="alpha_test">Cutout / Alpha Test</option><option value="blend">Translucent / Blend</option></select></label>
           <label>Drop Item<input id="blockDrop" value="self" /></label>
         </div>
         <button id="addBlockBtn">Add / Update Block</button>

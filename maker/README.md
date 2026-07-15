@@ -1,20 +1,18 @@
-# Bed-Mod Maker V2 Organized UI
+# Bed-Mod Maker V3
 
-Drop this `maker/` folder into the root of the `bed-mod-loader` GitHub Pages repo.
+Browser-based starter add-on maker for current Minecraft Bedrock packs.
 
-It keeps the older maker layout style while keeping V2 tools:
+## V3 changes
+- Updated generated pack minimum engine and content format versions to 1.21.130.
+- Updated the script dependency to stable `@minecraft/server` 2.6.0.
+- Fixed item texture aliases and modern `minecraft:icon` output.
+- Fixed custom block texture aliases and added required full-block geometry.
+- Replaced legacy block destroy/explosion components with current components.
+- Added PNG import into the 16x16 texture editor.
+- Added imported/pixel/automatic texture choices for items and blocks.
+- Added opaque, alpha-test, and blend block render choices.
+- Added `.kermit` maker project save/load.
+- Linked exported behavior and resource pack manifests with dependencies.
 
-- Project setup
-- Commands Builder
-- Function Builder
-- Item Creator with cooldown/use actions
-- Weapon Creator
-- Pixel Texture Editor
-- Recipes
-- Structure spawning helpers
-- Advanced Block Creator
-- Biome Creator
-- World Preset Designer
-- Add-on zip export
-
-This version intentionally does not include a Bedrock world editor, because editing uploaded Bedrock world database files in-browser can corrupt worlds.
+## Notes
+Structure binary data is not stored in `.kermit` project files, so structures must be re-imported after loading a saved maker project.
